@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "purpose": "Validation gate for prompt refinement. DO NOT use in tuning.",
+  "queries": [
+    "HV01: What design patterns are used in this codebase?",
+    "HV02: Which modules have the most external dependencies?",
+    "HV03: How is error handling standardized across services?",
+    "HV04: What testing strategies does this project use?",
+    "HV05: Where are the security boundaries?",
+    "HV06: How does data flow from user input to database?",
+    "HV07: What are the performance bottlenecks?",
+    "HV08: How is configuration managed across environments?",
+    "HV09: What logging and observability exists?",
+    "HV10: Which components would be hardest to replace?"
+  ]
+}

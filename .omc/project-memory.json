@@ -1,0 +1,402 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775809642996,
+  "projectRoot": "/Users/andresilvaburgstahler/Ws/Personal/graphwiki-skill",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "express",
+        "version": "4.21.0",
+        "category": "backend"
+      },
+      {
+        "name": "vitest",
+        "version": "3.0.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "build": "tsup",
+      "dev": "tsup --watch",
+      "typecheck": "tsc --noEmit",
+      "lint": "eslint src --ext .ts",
+      "fmt": "prettier --write src",
+      "test": "vitest",
+      "test:unit": "vitest --coverage --coverage.thresholds.lines=90 --coverage.thresholds.branches=85",
+      "test:integration": "vitest tests/integration",
+      "test:benchmark": "vitest tests/benchmark",
+      "test:watch": "vitest --watch",
+      "prepublishOnly": "tsup"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "src",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1775809642976,
+      "keyFiles": [
+        "types.ts"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 0,
+      "lastAccessed": 1775809642977,
+      "keyFiles": []
+    },
+    "tests/fixtures": {
+      "path": "tests/fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1775809642980,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src/serve/mcp-http.test.ts",
+      "accessCount": 22,
+      "lastAccessed": 1775821459165,
+      "type": "file"
+    },
+    {
+      "path": "src/dedup/embedding.ts",
+      "accessCount": 21,
+      "lastAccessed": 1775814481155,
+      "type": "file"
+    },
+    {
+      "path": "src/types.ts",
+      "accessCount": 18,
+      "lastAccessed": 1775816070236,
+      "type": "file"
+    },
+    {
+      "path": "src/serve/mcp-http.ts",
+      "accessCount": 12,
+      "lastAccessed": 1775821414985,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 10,
+      "lastAccessed": 1775814999248,
+      "type": "file"
+    },
+    {
+      "path": "src/serve/mcp-stdio.ts",
+      "accessCount": 10,
+      "lastAccessed": 1775819924555,
+      "type": "file"
+    },
+    {
+      "path": "src/providers/anthropic.test.ts",
+      "accessCount": 8,
+      "lastAccessed": 1775820964129,
+      "type": "file"
+    },
+    {
+      "path": "src/benchmark/baseline-runner.ts",
+      "accessCount": 7,
+      "lastAccessed": 1775810832413,
+      "type": "file"
+    },
+    {
+      "path": "src/benchmark/report-generator.ts",
+      "accessCount": 7,
+      "lastAccessed": 1775810838499,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 7,
+      "lastAccessed": 1775819906543,
+      "type": "directory"
+    },
+    {
+      "path": "src/providers/google.test.ts",
+      "accessCount": 7,
+      "lastAccessed": 1775820943182,
+      "type": "file"
+    },
+    {
+      "path": "src/util/math.ts",
+      "accessCount": 6,
+      "lastAccessed": 1775813906759,
+      "type": "file"
+    },
+    {
+      "path": "src/dedup/deduplicator.ts",
+      "accessCount": 6,
+      "lastAccessed": 1775814115164,
+      "type": "file"
+    },
+    {
+      "path": "src/dedup/deduplicator.test.ts",
+      "accessCount": 6,
+      "lastAccessed": 1775814347609,
+      "type": "file"
+    },
+    {
+      "path": "src/providers/openai.test.ts",
+      "accessCount": 6,
+      "lastAccessed": 1775820976089,
+      "type": "file"
+    },
+    {
+      "path": "src/dedup/embedding.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1775814179212,
+      "type": "file"
+    },
+    {
+      "path": "src/wiki/updater.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1775810899412,
+      "type": "file"
+    },
+    {
+      "path": "src/benchmark/token-counter.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1775819916899,
+      "type": "file"
+    },
+    {
+      "path": "src/benchmark/token-counter.ts",
+      "accessCount": 4,
+      "lastAccessed": 1775820434346,
+      "type": "file"
+    },
+    {
+      "path": "src/wiki/compiler.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775810731078,
+      "type": "file"
+    },
+    {
+      "path": "src/util/hash.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775810766298,
+      "type": "file"
+    },
+    {
+      "path": "src/benchmark/baseline-runner.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775810790294,
+      "type": "file"
+    },
+    {
+      "path": "src/benchmark/report-generator.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775810859287,
+      "type": "file"
+    },
+    {
+      "path": "src/graph/traversal.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775809735266,
+      "type": "file"
+    },
+    {
+      "path": "src/detect/detector.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775809800273,
+      "type": "file"
+    },
+    {
+      "path": "src/detect/detector.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775809800728,
+      "type": "file"
+    },
+    {
+      "path": "src/providers/provider.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775809809860,
+      "type": "file"
+    },
+    {
+      "path": "src/report/types.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775810450383,
+      "type": "file"
+    },
+    {
+      "path": "src/query/types.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775810553678,
+      "type": "file"
+    },
+    {
+      "path": "src/wiki/updater.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775810701836,
+      "type": "file"
+    },
+    {
+      "path": "src/extract/extraction-cache.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775813943592,
+      "type": "file"
+    },
+    {
+      "path": "src/providers/anthropic.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775820510846,
+      "type": "file"
+    },
+    {
+      "path": "src/providers/google.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775820814377,
+      "type": "file"
+    },
+    {
+      "path": "src/graph/delta.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809664071,
+      "type": "file"
+    },
+    {
+      "path": "src/graph/cluster.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809693948,
+      "type": "file"
+    },
+    {
+      "path": "src/providers/provider.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809718626,
+      "type": "file"
+    },
+    {
+      "path": "src/providers/openai.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809769430,
+      "type": "file"
+    },
+    {
+      "path": "src/util/hash.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809769657,
+      "type": "file"
+    },
+    {
+      "path": "src/util/frontmatter.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809769943,
+      "type": "file"
+    },
+    {
+      "path": "src/util/token-estimator.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809770236,
+      "type": "file"
+    },
+    {
+      "path": "src/graph/cluster.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809933794,
+      "type": "file"
+    },
+    {
+      "path": "src/graph/drift.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809934091,
+      "type": "file"
+    },
+    {
+      "path": "src/graph/traversal.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809934419,
+      "type": "file"
+    },
+    {
+      "path": "src/graph/delta.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809934724,
+      "type": "file"
+    },
+    {
+      "path": "src/wiki/types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775809935413,
+      "type": "file"
+    },
+    {
+      "path": "src/refine/tracer.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775810083415,
+      "type": "file"
+    },
+    {
+      "path": "src/refine/tracer.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775810101996,
+      "type": "file"
+    },
+    {
+      "path": "src/refine/diagnostician.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775810137254,
+      "type": "file"
+    },
+    {
+      "path": "src/wiki/compiler.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775810155051,
+      "type": "file"
+    },
+    {
+      "path": "src/refine/diagnostician.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775810166511,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

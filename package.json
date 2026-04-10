@@ -1,0 +1,63 @@
+{
+  "name": "graphwiki",
+  "version": "2.0.0",
+  "description": "LLM knowledge graph with persistent wiki compilation — TypeScript, TDD 90%+, dual-transport MCP",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "graphwiki": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "fmt": "prettier --write src",
+    "test": "vitest",
+    "test:unit": "vitest --coverage --coverage.thresholds.lines=90 --coverage.thresholds.branches=85",
+    "test:integration": "vitest tests/integration",
+    "test:benchmark": "vitest tests/benchmark",
+    "test:watch": "vitest --watch",
+    "prepublishOnly": "tsup"
+  },
+  "keywords": [
+    "knowledge-graph",
+    "llm",
+    "wiki",
+    "mcp",
+    "tree-sitter",
+    "graph",
+    "knowledge-base"
+  ],
+  "license": "MIT",
+  "packageManager": "pnpm@9.0.0",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "commander": "^12.0.0",
+    "express": "^4.21.0",
+    "glob": "^11.0.0",
+    "gray-matter": "^4.0.3",
+    "onnxruntime-node": "^1.20.0",
+    "pdfjs-dist": "^4.9.0",
+    "tree-sitter": "^0.22.0",
+    "xxhash-wasm": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.4.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
