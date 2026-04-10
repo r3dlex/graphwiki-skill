@@ -10,7 +10,6 @@ jobs:
   archgate:
     name: archgate check
     runs-on: ubuntu-latest
-    working-directory: ${{ github.workspace }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,15 +28,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Pre-flight: verify rule scopes
+      - name: Verify rule scopes
         run: |
-          # Assert each .rules.ts scope string matches its filename prefix
-          grep "scope: 'src/graph/'" arch/rules/graph.rules.ts || { echo "graph.rules.ts scope mismatch"; exit 1; }
-          grep "scope: 'src/wiki/'" arch/rules/wiki.rules.ts || { echo "wiki.rules.ts scope mismatch"; exit 1; }
-          grep "scope: 'src/serve/'" arch/rules/serve.rules.ts || { echo "serve.rules.ts scope mismatch"; exit 1; }
-          grep "scope: 'src/dedup/'" arch/rules/dedup.rules.ts || { echo "dedup.rules.ts scope mismatch"; exit 1; }
+          set -e
+          grep "scope: 'src/graph/'" arch/rules/graph.rules.ts
+          grep "scope: 'src/wiki/'" arch/rules/wiki.rules.ts
+          grep "scope: 'src/serve/'" arch/rules/serve.rules.ts
+          grep "scope: 'src/dedup/'" arch/rules/dedup.rules.ts
 
-      - name: Install archgate (standalone curl)
+      - name: Install archgate
         run: |
           for i in 1 2 3; do
             curl -fsSL https://cli.archgate.dev/install-unix | sh && break
@@ -48,7 +47,6 @@ jobs:
       - name: Verify archgate CLI
         run: |
           archgate --version || { echo "archgate version check failed"; exit 1; }
-          archgate check --help | grep -q 'config' || { echo "archgate --config not supported"; exit 1; }
 
       - name: Run archgate check
         run: archgate check --config arch/rules/archgate.config.ts
