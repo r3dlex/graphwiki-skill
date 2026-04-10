@@ -130,14 +130,15 @@ jobs:
           node --import tsx -e "
             import { generateHooksJsonEntries } from './src/hooks/skill-generator.ts';
             const entries = JSON.parse(generateHooksJsonEntries());
-            const hooksJson = { hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'echo existing' }] }] } };
-            const merged = { ...hooksJson, hooks: { ...hooksJson.hooks, PreToolUse: [...(hooksJson.hooks.PreToolUse || []), ...entries.PreToolUse] } };
-            const hasExisting = merged.hooks.PreToolUse.some(h => h.command === 'echo existing');
-            const hasGraphwiki = merged.hooks.PreToolUse.some(h => h.command.includes('graphwiki-pretool'));
-            console.log('Has existing entry:', hasExisting);
-            console.log('Has graphwiki entry:', hasGraphwiki);
-            if (!hasExisting || !hasGraphwiki) process.exit(1);
-            console.log('Hook merge: PASS');
+            // Verify graphwiki entries have correct structure (matcher + hooks array)
+            const hasPreToolUse = entries.PreToolUse?.length > 0 && entries.PreToolUse[0].hooks?.[0]?.command?.includes('graphwiki-pretool');
+            const hasSessionStart = entries.SessionStart?.length > 0 && entries.SessionStart[0].hooks?.[0]?.command?.includes('graphwiki-session');
+            const hasPostToolUse = entries.PostToolUse?.length > 0 && entries.PostToolUse[0].hooks?.[0]?.command?.includes('graphwiki-posttool');
+            console.log('Has PreToolUse entry:', !!hasPreToolUse);
+            console.log('Has SessionStart entry:', !!hasSessionStart);
+            console.log('Has PostToolUse entry:', !!hasPostToolUse);
+            if (!hasPreToolUse || !hasSessionStart || !hasPostToolUse) process.exit(1);
+            console.log('Hook entries: PASS');
           "
 
   release:
