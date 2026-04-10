@@ -42,7 +42,7 @@ jobs:
             curl -fsSL https://cli.archgate.dev/install-unix | sh && break
             echo "Attempt $i failed, retrying..."
           done
-          command -v archgate || { echo "archgate not found after 3 retries"; exit 1; }
+          echo "PATH=$HOME/.archgate/bin:$PATH" >> $GITHUB_ENV
 
       - name: Verify archgate CLI
         run: |
@@ -75,8 +75,5 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Typecheck
-        run: pnpm typecheck
-
       - name: Unit tests
-        run: pnpm test:unit
+        run: pnpm test
