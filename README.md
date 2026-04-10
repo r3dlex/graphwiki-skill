@@ -58,9 +58,53 @@ graphwiki status
 
 ---
 
+## PreToolUse Hook Integration
+
+GraphWiki integrates with Claude Code via the PreToolUse hook (managed by oh-my-claude).
+
+**Hook scripts:** `scripts/graphwiki-pretool.mjs`, `scripts/graphwiki-session-start.mjs`, `scripts/graphwiki-posttool.mjs`
+**Hook registration:** `~/.claude/plugins/marketplaces/omc/hooks/hooks.json` (via skill installer)
+**Timeout:** 3 seconds
+**Hook events:** `PreToolUse`, `SessionStart`, `PostToolUse`
+
+### Hook Behavior
+
+Before every tool use, the PreToolUse hook automatically:
+
+1. Extracts entities from tool input (file paths, CamelCase identifiers, query terms)
+2. Routes to the appropriate graph query:
+   - **Read / Grep / Glob** -> `graphwiki path <term1> <term2>` (0 LLM tokens)
+   - **Ask / Query** -> `graphwiki query "<question>"` (loads wiki pages)
+3. Writes context to session state for the agent to consume
+4. Tracks token budget (warns at 80% of 150K tokens)
+5. Gracefully degrades if graphwiki CLI is unavailable
+
+The hook never blocks tool execution. Tool calls always proceed regardless of hook outcome.
+
+---
+
+## Platform Installation
+
+Install GraphWiki for your platform:
+
+| Platform | Command |
+|----------|---------|
+| Claude Code | `graphwiki skill install --platform claude` |
+| Codex | `graphwiki skill install --platform codex` |
+| Gemini | `graphwiki skill install --platform gemini` |
+| Cursor | `graphwiki skill install --platform cursor` |
+| OpenClaw | `graphwiki skill install --platform openclaw` |
+| GitHub Copilot | Copy `SKILL-copilot.md` to `.github/copilot/` |
+
+**Auggie:** Excluded from v2. Auggie's hook API is undocumented and requires separate research before integration.
+
+For full skill documentation, see [SKILL.md](SKILL.md).
+
+---
+
 ## Context Loading Protocol
 
-When working with Claude Code, follow this order:
+When the PreToolUse hook provides insufficient context, follow this manual protocol:
 
 | Step | Action |
 |------|--------|
@@ -69,6 +113,24 @@ When working with Claude Code, follow this order:
 | 3 | Read `wiki/index.md` to find relevant pages |
 | 4 | Read targeted wiki pages (~2-5K each, max 3) |
 | 5 | Only read `raw/` files if wiki page missing or low-confidence |
+
+---
+
+## Skill System Architecture
+
+GraphWiki uses a multi-agent skill system with the following agents:
+
+| Agent | Role | Tools | Protocol |
+|-------|------|-------|----------|
+| oma-explorer | codebase-search | bash, read, glob, grep | Context Loading Protocol |
+| oma-analyst | requirements | read, bash | Drift detection, wiki consistency |
+| oma-planner | planning | read, bash, write | GraphWiki context for planning |
+| oma-executor | implementation | bash, read, edit, glob, write | GraphWiki command execution |
+| oma-verifier | verification | bash, read | graphwiki lint, coverage validation |
+
+The skill installer (`graphwiki skill install`) registers PreToolUse hooks via oh-my-claude's hooks.json, enabling automatic context enrichment before each tool call.
+
+For detailed skill configuration and generator, see [SKILL.md](SKILL.md).
 
 ---
 

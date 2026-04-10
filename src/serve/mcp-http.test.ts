@@ -110,7 +110,6 @@ describe('mcp-http', () => {
       };
       const mockNext = vi.fn();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (routeLayer.handle as any)(mockReq, mockRes, mockNext);
 
       expect(mockHandler).toHaveBeenCalled();
@@ -131,9 +130,7 @@ describe('mcp-http', () => {
         status: vi.fn().mockReturnThis(),
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (routeLayer.handle as any)(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { body: { jsonrpc: '1.0', id: 1, method: 'test' }, query: {}, method: 'POST', path: '/mcp', url: '/mcp', headers: {}, get: vi.fn(), app: app },
         mockRes,
         vi.fn()

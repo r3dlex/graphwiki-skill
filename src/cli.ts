@@ -466,18 +466,77 @@ program
     }
   });
 
-// Install command
-program
+// Skill command (install, generate, uninstall)
+const skill = program.command('skill').description('Skill management commands');
+
+// Skill install
+skill
   .command('install')
   .description('Install GraphWiki skill for your platform')
-  .option('--platform <p>', 'Platform: claude, codex, gemini, cursor, openclaw')
+  .option('--platform <p>', 'Platform: claude, codex, gemini, cursor, openclaw, copilot')
+  .option('--hooks', 'Also install PreToolUse hooks', false)
   .action(async (options) => {
     const platform = options.platform || 'claude';
     console.log(`[GraphWiki] Installing skill for ${platform}...`);
 
-    // Skill installation would happen here
+    // Dynamic import to avoid circular deps
+    const { installSkill, installAll } = await import('./hooks/skill-installer.js');
+
+    if (options.hooks || platform === 'claude') {
+      await installAll();
+    } else {
+      await installSkill(platform as Parameters<typeof installSkill>[0]);
+    }
     console.log(`[GraphWiki] Skill installed successfully!`);
     console.log(`[GraphWiki] Restart your IDE/CLI to use the graphwiki skill`);
+  });
+
+// Skill generate
+skill
+  .command('generate')
+  .description('Generate platform-specific skill files')
+  .option('--check', 'Verify files match (exit non-zero if mismatched)')
+  .action(async (options) => {
+    console.log(`[GraphWiki] Generating skill files...`);
+
+    const { generateHooksJsonEntries } = await import('./hooks/skill-generator.js');
+
+    // Run the generator
+    const { exec } = await import('child_process');
+    const util = await import('util');
+    const execPromise = util.promisify(exec);
+
+    const args = options.check ? ['--check'] : [];
+    try {
+      await execPromise(`tsx src/hooks/skill-generator.ts ${args.join(' ')}`, { cwd: process.cwd() });
+      console.log('[GraphWiki] Skill files generated successfully');
+    } catch (err) {
+      console.error(`[GraphWiki] Generation failed: ${err}`);
+      process.exit(1);
+    }
+
+    // Show hook entries
+    const hookEntries = generateHooksJsonEntries();
+    console.log('\n[GraphWiki] Hook entries for hooks.json:');
+    console.log(hookEntries);
+  });
+
+// Skill uninstall
+skill
+  .command('uninstall')
+  .description('Remove GraphWiki skill installation')
+  .option('--platform <p>', 'Platform to uninstall from')
+  .option('--hooks', 'Also remove PreToolUse hooks', false)
+  .action(async (options) => {
+    const platform = options.platform || 'claude';
+    console.log(`[GraphWiki] Uninstalling skill for ${platform}...`);
+
+    const { uninstallHook } = await import('./hooks/skill-installer.js');
+
+    if (options.hooks || platform === 'claude') {
+      await uninstallHook();
+    }
+    console.log(`[GraphWiki] Skill uninstalled successfully`);
   });
 
 // Export command
