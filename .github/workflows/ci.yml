@@ -75,3 +75,92 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+  hook-deployment:
+    name: Hook Deployment Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Generate skill files
+        run: pnpm run generate:skills
+
+      - name: Verify generated files
+        run: pnpm run generate:skills --check
+
+      - name: Verify hook scripts exist and are valid ESM
+        run: |
+          node --input-type=module < scripts/graphwiki-pretool.mjs && echo "pretool.mjs: valid ESM"
+          node --input-type=module < scripts/graphwiki-session-start.mjs && echo "session-start.mjs: valid ESM"
+          node --input-type=module < scripts/graphwiki-posttool.mjs && echo "posttool.mjs: valid ESM"
+
+      - name: Simulate PreToolUse hook with snake_case event (Read tool)
+        run: |
+          echo '{"tool_name":"Read","tool_input":{"file_path":"/src/Auth.ts"},"cwd":".","session_id":"test123"}' | \
+          node scripts/graphwiki-pretool.mjs
+          echo "PreToolUse Read: OK"
+
+      - name: Simulate PreToolUse hook with snake_case event (Ask tool)
+        run: |
+          echo '{"tool_name":"Ask","tool_input":{"prompt":"What is authentication?"},"cwd":".","session_id":"test123"}' | \
+          node scripts/graphwiki-pretool.mjs
+          echo "PreToolUse Ask: OK"
+
+      - name: Simulate PreToolUse hook with snake_case event (Bash tool - skip)
+        run: |
+          echo '{"tool_name":"Bash","tool_input":{"command":"ls"},"cwd":".","session_id":"test123"}' | \
+          node scripts/graphwiki-pretool.mjs
+          echo "PreToolUse Bash: OK"
+
+      - name: Simulate hook installation
+        run: |
+          mkdir -p /tmp/test-hooks
+          echo '{"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "echo existing"}]}]}}' > /tmp/test-hooks/hooks.json
+
+          node -e "
+            const { generateHooksJsonEntries } = await import('./dist/hooks/skill-generator.js');
+            const entries = JSON.parse(generateHooksJsonEntries());
+            const hooksJson = { hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'echo existing' }] }] } };
+            const merged = { ...hooksJson, hooks: { ...hooksJson.hooks, PreToolUse: [...(hooksJson.hooks.PreToolUse || []), ...entries.hooks.PreToolUse] } };
+            const hasExisting = merged.hooks.PreToolUse.some(h => h.command === 'echo existing');
+            const hasGraphwiki = merged.hooks.PreToolUse.some(h => h.command.includes('graphwiki-pretool'));
+            console.log('Has existing entry:', hasExisting);
+            console.log('Has graphwiki entry:', hasGraphwiki);
+            if (!hasExisting || !hasGraphwiki) process.exit(1);
+            console.log('Hook merge: PASS');
+          "
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [test, hook-deployment]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run generate:skills
+      - run: pnpm build
+      - run: pnpm test
+      - run: pnpm changeset publish
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -171,7 +171,7 @@ export class TokenCounter {
     }
 
     // Code-like tokens (brackets, operators, etc.)
-    if (/^[\[\]{}(){}<>@#$%^&*+=~/\\|]+$/.test(token)) {
+    if (/^[[\]{}(){}<>@#$%^&*+=~/\\|]+$/.test(token)) {
       // Each symbol is typically 1 token
       return token.length;
     }

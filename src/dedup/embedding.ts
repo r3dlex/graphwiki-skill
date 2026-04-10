@@ -102,13 +102,11 @@ export class ONNXEmbedding {
     for (let k = 0; k < attentionMaskView.length; k++) {
       attentionMaskF32[k] = Number(attentionMaskView[k]);
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const feeds: Record<string, Float32Array> = {
       input_ids: inputIdsF32,
       attention_mask: attentionMaskF32,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const outputMap = await this.session.run(feeds as any);
     const outputKeys = Object.keys(outputMap);
     if (!outputKeys[0]) throw new Error("ONNX model returned no output keys");

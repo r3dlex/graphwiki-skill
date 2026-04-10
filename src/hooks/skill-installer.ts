@@ -2,7 +2,9 @@
 // Supports: claude, codex, gemini, cursor, openclaw
 
 import { writeFile, mkdir, readFile, access } from 'fs/promises';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 
 export type Platform = 'claude' | 'codex' | 'gemini' | 'cursor' | 'openclaw';
 
@@ -286,4 +288,125 @@ export async function installAllSkills(installPath?: string): Promise<void> {
  */
 export function getSkillDefinition(platform: Platform): SkillDefinition {
   return SKILL_DEFINITIONS[platform];
+}
+
+// ============================================================
+// Hook Installation
+// ============================================================
+
+const HOOKS_JSON_PATH = join(process.env.HOME ?? '.', '.claude', 'plugins', 'marketplaces', 'omc', 'hooks', 'hooks.json');
+
+interface HookEntry {
+  type: string;
+  command: string;
+  timeout?: number;
+}
+
+interface HookMatcher {
+  matcher: string;
+  hooks: HookEntry[];
+}
+
+interface HooksJson {
+  hooks: Record<string, HookMatcher[]>;
+}
+
+/**
+ * Deep merge hook arrays - preserves existing entries, appends new ones
+ */
+function deepMergeHooks(existing: HookMatcher[], newEntries: HookMatcher[]): HookMatcher[] {
+  const result = [...existing];
+
+  for (const newMatcher of newEntries) {
+    const existingMatcher = result.find(m => m.matcher === newMatcher.matcher);
+    if (existingMatcher) {
+      // Merge hooks arrays - avoid duplicates by command
+      const existingCommands = new Set(existingMatcher.hooks.map(h => h.command));
+      for (const hook of newMatcher.hooks) {
+        if (!existingCommands.has(hook.command)) {
+          existingMatcher.hooks.push(hook);
+        }
+      }
+    } else {
+      result.push(newMatcher);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Install PreToolUse hooks for graphwiki
+ */
+export async function installHook(): Promise<void> {
+  const { generateHooksJsonEntries } = await import('./skill-generator.js');
+  const entries = JSON.parse(generateHooksJsonEntries()) as HooksJson;
+
+  // Ensure directory exists
+  const hooksDir = dirname(HOOKS_JSON_PATH);
+  await mkdir(hooksDir, { recursive: true });
+
+  // Read existing hooks.json or create new
+  let existing: HooksJson = { hooks: {} };
+  try {
+    const content = await readFile(HOOKS_JSON_PATH, 'utf-8');
+    existing = JSON.parse(content);
+  } catch {
+    // File doesn't exist, start fresh
+  }
+
+  // Deep merge hooks
+  for (const [event, matchers] of Object.entries(entries.hooks)) {
+    if (!existing.hooks[event]) {
+      existing.hooks[event] = [];
+    }
+    existing.hooks[event] = deepMergeHooks(existing.hooks[event], matchers);
+  }
+
+  // Write merged result
+  await writeFile(HOOKS_JSON_PATH, JSON.stringify(existing, null, 2), 'utf-8');
+  console.log(`[GraphWiki] Hooks installed to ${HOOKS_JSON_PATH}`);
+}
+
+/**
+ * Uninstall graphwiki hooks
+ */
+export async function uninstallHook(): Promise<void> {
+  const { generateHooksJsonEntries } = await import('./skill-generator.js');
+  const entries = JSON.parse(generateHooksJsonEntries()) as HooksJson;
+
+  try {
+    const content = await readFile(HOOKS_JSON_PATH, 'utf-8');
+    const existing = JSON.parse(content) as HooksJson;
+
+    // Remove graphwiki hooks by command match
+    const graphwikiCommands = [
+      'graphwiki-pretool',
+      'graphwiki-session-start',
+      'graphwiki-posttool',
+    ];
+
+    for (const event of Object.keys(existing.hooks)) {
+      existing.hooks[event] = existing.hooks[event].map(matcher => ({
+        ...matcher,
+        hooks: matcher.hooks.filter(h =>
+          !graphwikiCommands.some(cmd => h.command?.includes(cmd))
+        ),
+      })).filter(matcher => matcher.hooks.length > 0);
+    }
+
+    await writeFile(HOOKS_JSON_PATH, JSON.stringify(existing, null, 2), 'utf-8');
+    console.log(`[GraphWiki] Hooks uninstalled from ${HOOKS_JSON_PATH}`);
+  } catch {
+    console.log(`[GraphWiki] No hooks.json found at ${HOOKS_JSON_PATH}`);
+  }
+}
+
+/**
+ * Install both skill and hooks
+ */
+export async function installAll(): Promise<void> {
+  const platform = await detectPlatform();
+  await installSkill(platform);
+  await installHook();
 }

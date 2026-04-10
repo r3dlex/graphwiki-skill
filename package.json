@@ -13,8 +13,20 @@
     "graphwiki": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "SKILL.md",
+    "SKILL-claude.md",
+    "SKILL-codex.md",
+    "SKILL-copilot.md",
+    "SKILL-gemini.md",
+    "SKILL-cursor.md",
+    "SKILL-openclaw.md",
+    "scripts"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -26,7 +38,9 @@
     "test:integration": "vitest tests/integration",
     "test:benchmark": "vitest tests/benchmark",
     "test:watch": "vitest --watch",
-    "prepublishOnly": "tsup"
+    "generate:skills": "tsx src/hooks/skill-generator.ts",
+    "prepublishOnly": "pnpm run build && pnpm run generate:skills",
+    "release": "changesets publish"
   },
   "keywords": [
     "knowledge-graph",
@@ -58,7 +72,9 @@
     "prettier": "^3.4.0",
     "ts-morph": "^25.0.0",
     "tsup": "^8.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.58.1",
     "vitest": "^3.0.0"
   }
 }

@@ -30,7 +30,6 @@ const LANGUAGE_LOADERS: Record<string, LanguageLoader> = {
 
 let parserCache: Map<string, unknown> = new Map();
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function _getLanguage(language: string): Promise<unknown> {
   if (parserCache.has(language)) return parserCache.get(language);
 
