@@ -127,11 +127,11 @@ jobs:
           mkdir -p /tmp/test-hooks
           echo '{"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "echo existing"}]}]}}' > /tmp/test-hooks/hooks.json
 
-          node -e "
-            const { generateHooksJsonEntries } = await import('./dist/hooks/skill-generator.js');
+          node --import tsx -e "
+            import { generateHooksJsonEntries } from './src/hooks/skill-generator.ts';
             const entries = JSON.parse(generateHooksJsonEntries());
             const hooksJson = { hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'echo existing' }] }] } };
-            const merged = { ...hooksJson, hooks: { ...hooksJson.hooks, PreToolUse: [...(hooksJson.hooks.PreToolUse || []), ...entries.hooks.PreToolUse] } };
+            const merged = { ...hooksJson, hooks: { ...hooksJson.hooks, PreToolUse: [...(hooksJson.hooks.PreToolUse || []), ...entries.PreToolUse] } };
             const hasExisting = merged.hooks.PreToolUse.some(h => h.command === 'echo existing');
             const hasGraphwiki = merged.hooks.PreToolUse.some(h => h.command.includes('graphwiki-pretool'));
             console.log('Has existing entry:', hasExisting);
