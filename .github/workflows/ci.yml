@@ -37,19 +37,14 @@ jobs:
           grep "scope: 'src/dedup/'" arch/rules/dedup.rules.ts
 
       - name: Install archgate
-        run: |
-          for i in 1 2 3; do
-            curl -fsSL https://cli.archgate.dev/install-unix | sh && break
-            echo "Attempt $i failed, retrying..."
-          done
-          echo "PATH=$HOME/.archgate/bin:$PATH" >> $GITHUB_ENV
+        run: npm install -g archgate
 
       - name: Verify archgate CLI
         run: |
           archgate --version || { echo "archgate version check failed"; exit 1; }
 
       - name: Run archgate check
-        run: archgate check --config arch/rules/archgate.config.ts
+        run: archgate check --ci
 
   test:
     name: Tests
