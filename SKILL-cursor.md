@@ -15,6 +15,11 @@
     "copilot",
     "windsurf",
     "cody",
-    "codewhisperer"
+    "codewhisperer",
+    "opencode",
+    "aider",
+    "droid",
+    "trae",
+    "trae-cn"
   ]
 }

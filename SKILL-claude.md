@@ -2,7 +2,7 @@
 name: graphwiki
 version: 2.0.0
 description: LLM knowledge graph with persistent wiki compilation
-platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer, opencode, aider, droid, trae, trae-cn]
 ---
 
 # GraphWiki Skill
@@ -102,11 +102,14 @@ Wiki pages have YAML frontmatter:
 
 - **Claude Code:** `graphwiki skill install --platform claude`
 - **Codex:** `graphwiki skill install --platform codex`
+- **Auggie:** `graphwiki skill install --platform auggie` (writes to `~/.augment/settings.json`)
 - **Gemini:** `graphwiki skill install --platform gemini`
 - **Cursor:** `graphwiki skill install --platform cursor`
 - **OpenClaw:** `graphwiki skill install --platform openclaw`
+- **WindSurf:** Manual: copy `SKILL-windsurf.md` to WindSurf config
+- **Cody:** Manual: copy `SKILL-cody.md` to Cody config
+- **CodeWhisperer:** Manual: copy `SKILL-codewhisperer.md` to CodeWhisperer config
 - **GitHub Copilot:** copy SKILL-copilot.md to `.github/copilot/`
-- **Auggie:** `graphwiki skill install --platform auggie` (writes to `~/.augment/settings.json`)
 
 ## PreToolUse Hook Integration (for skill installer)
 
@@ -146,8 +149,11 @@ Exit code 2 = blocking; other exit codes non-blocking. Events use snake_case: `t
 `skill-generator.ts` parses this file and generates:
 - SKILL-claude.md
 - SKILL-codex.md
+- SKILL-copilot.md
 - SKILL-auggie.md
 - SKILL-gemini.md
 - SKILL-cursor.md
 - SKILL-openclaw.md
-- SKILL-copilot.md
+- SKILL-windsurf.md
+- SKILL-cody.md
+- SKILL-codewhisperer.md

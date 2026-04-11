@@ -1,0 +1,366 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generate > aider — markdown with YAML frontmatter 1`] = `
+"---
+name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+---
+
+# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > auggie — markdown with YAML frontmatter 1`] = `
+"---
+name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+---
+
+# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > codewhisperer — markdown with YAML frontmatter 1`] = `
+"---
+name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+---
+
+# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > codex — abbreviated markdown, no frontmatter, original headings 1`] = `
+"# graphwiki - LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > cody — markdown with YAML frontmatter 1`] = `
+"---
+name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+---
+
+# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > copilot — abbreviated markdown, no frontmatter, renamed headings 1`] = `
+"# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## How to Use
+
+1. Read graph report
+2. Use path queries
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Rules
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > cursor — JSON format with all fields 1`] = `
+"{
+  "name": "graphwiki",
+  "version": "2.0.0",
+  "description": "LLM knowledge graph with persistent wiki compilation",
+  "contextLoadingProtocol": "1. Read graph report\\n2. Use path queries",
+  "commands": "| Command | Description |\\n|---------|-------------|\\n| \`graphwiki build .\` | Build the graph |",
+  "hardConstraints": "- NEVER modify raw/",
+  "platforms": [
+    "claude",
+    "codex",
+    "auggie",
+    "gemini",
+    "cursor",
+    "openclaw",
+    "copilot",
+    "windsurf",
+    "cody",
+    "codewhisperer"
+  ]
+}"
+`;
+
+exports[`generate > droid — markdown with YAML frontmatter 1`] = `
+"---
+name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+---
+
+# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > gemini — plain text, UPPER_CASE section names 1`] = `
+"GRAPHWIKI
+LLM knowledge graph with persistent wiki compilation
+
+CONTEXT LOADING PROTOCOL
+1. Read graph report
+2. Use path queries
+
+COMMANDS
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+HARD CONSTRAINTS
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > openclaw — YAML format with indented blocks 1`] = `
+"name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+
+context_loading_protocol: |
+  1. Read graph report
+  2. Use path queries
+
+commands: |
+  | Command | Description |
+  |---------|-------------|
+  | \`graphwiki build .\` | Build the graph |
+
+hard_constraints: |
+  - NEVER modify raw/
+
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+"
+`;
+
+exports[`generate > opencode — markdown with YAML frontmatter 1`] = `
+"---
+name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+---
+
+# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > trae — markdown with YAML frontmatter 1`] = `
+"---
+name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+---
+
+# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > trae-cn — same output as trae 1`] = `
+"---
+name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+---
+
+# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;
+
+exports[`generate > windsurf — markdown with YAML frontmatter 1`] = `
+"---
+name: graphwiki
+version: 2.0.0
+description: LLM knowledge graph with persistent wiki compilation
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+---
+
+# graphwiki
+
+LLM knowledge graph with persistent wiki compilation
+
+## Context Loading Protocol
+
+1. Read graph report
+2. Use path queries
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| \`graphwiki build .\` | Build the graph |
+
+## Hard Constraints
+
+- NEVER modify raw/
+"
+`;

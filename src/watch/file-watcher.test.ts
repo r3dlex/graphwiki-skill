@@ -98,4 +98,60 @@ describe('FileWatcher', () => {
     });
     await watcher.start();
   });
+
+  // ── Watcher routing tests (4 required) ──────────────────────────────────
+
+  // code-auto: .ts file change calls onUpdate
+  it('code-auto: .ts file change calls onUpdate via flush()', async () => {
+    watcher = new FileWatcher({ path: '/test', onUpdate, onError });
+    await watcher.start();
+
+    const watcherAny = watcher as any;
+    watcherAny.onEvent('change', 'src/index.ts');
+    await new Promise(r => setTimeout(r, 600));
+
+    expect(onUpdate).toHaveBeenCalled();
+  });
+
+  // doc-notify-default: .md file change calls onNotify (not onUpdate) when autoDocs not set
+  it('doc-notify-default: .md file change calls onNotify when autoDocs is not set', async () => {
+    const onNotify = vi.fn();
+    watcher = new FileWatcher({ path: '/test', onUpdate, onNotify, onError });
+    await watcher.start();
+
+    const watcherAny = watcher as any;
+    watcherAny.onEvent('change', 'README.md');
+    await new Promise(r => setTimeout(r, 600));
+
+    expect(onNotify).toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  // doc-auto-with-flag: .md file change calls onUpdate when autoDocs is set
+  it('doc-auto-with-flag: .md file change calls onUpdate when autoDocs is true', async () => {
+    const onNotify = vi.fn();
+    watcher = new FileWatcher({ path: '/test', onUpdate, onNotify, autoDocs: true, onError });
+    await watcher.start();
+
+    const watcherAny = watcher as any;
+    watcherAny.onEvent('change', 'README.md');
+    await new Promise(r => setTimeout(r, 600));
+
+    expect(onUpdate).toHaveBeenCalled();
+    expect(onNotify).not.toHaveBeenCalled();
+  });
+
+  // media-notify: .mp3 file change calls onNotify
+  it('media-notify: .mp3 file change calls onNotify', async () => {
+    const onNotify = vi.fn();
+    watcher = new FileWatcher({ path: '/test', onUpdate, onNotify, onError });
+    await watcher.start();
+
+    const watcherAny = watcher as any;
+    watcherAny.onEvent('change', 'podcast.mp3');
+    await new Promise(r => setTimeout(r, 600));
+
+    expect(onNotify).toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
 });

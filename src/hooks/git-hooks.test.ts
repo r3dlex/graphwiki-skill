@@ -1,8 +1,7 @@
 // Tests for git-hooks.ts
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 
 // Mock fs/promises
 vi.mock('fs/promises', () => ({
@@ -68,7 +67,7 @@ describe('git-hooks', () => {
       await installGitHooks('/mock/git', '/mock/git/hooks');
 
       expect(mockExec).toHaveBeenCalled();
-      const execCall = mockExec.mock.calls[0][0] as string;
+      const execCall = mockExec.mock.calls[0]![0] as string;
       expect(execCall).toContain('git config core.hooksPath');
       expect(execCall).toContain('/mock/git/hooks');
     });
@@ -91,7 +90,7 @@ describe('git-hooks', () => {
       await uninstallGitHooks('/mock/git');
 
       expect(mockExec).toHaveBeenCalled();
-      const execCall = mockExec.mock.calls[0][0] as string;
+      const execCall = mockExec.mock.calls[0]![0] as string;
       expect(execCall).toContain('git config --unset core.hooksPath');
     });
 

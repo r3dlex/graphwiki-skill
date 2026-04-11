@@ -129,6 +129,11 @@ program
   .option('--permissive', 'Allow coerced extraction results')
   .option('--full-cluster', 'Build full cluster')
   .option('--cluster-only', 'Run clustering only (skip extraction)')
+  .option('--graph-only', 'Build graph only (skip wiki compilation)')
+  .option('--wiki-only', 'Recompile wiki only (skip extraction, use existing graph)')
+  .option('--svg [path]', 'Export graph to SVG after build')
+  .option('--neo4j-push <uri>', 'Push graph to Neo4j after build (requires NEO4J_USER and NEO4J_PASSWORD env vars)')
+  .option('--auto-docs', 'Route doc file changes to onUpdate in watch mode (default: notify only)')
   .option('--force', 'Force full rebuild (clear cache)')
   .option('--no-onnx', 'Use rough similarity fallback (skip ONNX model download)')
   .option('--directed', 'Use directed edge semantics')
@@ -242,6 +247,23 @@ program
         }
       }
 
+      // --wiki-only: skip extraction, recompile wiki from existing graph
+      if (options.wikiOnly) {
+        console.log('[GraphWiki] --wiki-only: recompiling wiki from existing graph (skipping extraction)...');
+        const { WikiUpdater } = await import('./wiki/updater.js');
+        const { WikiCompiler } = await import('./wiki/compiler.js');
+        const provider = null as unknown as import('./types.js').LLMProvider; // no LLM needed for recompile
+        const compiler = new WikiCompiler(provider, { mode: options.mode ?? 'standard' });
+        const updater = new WikiUpdater('.graphwiki/wiki', compiler);
+        await updater.recompile(finalGraph);
+        console.log('[GraphWiki] Wiki recompile complete.');
+      }
+
+      // --graph-only: skip wiki compilation (already done above conditionally, just log)
+      if (options.graphOnly && !options.wikiOnly) {
+        console.log('[GraphWiki] --graph-only: skipping wiki compilation.');
+      }
+
       // Simulate build completion
       console.log('[GraphWiki] Build complete!');
       console.log(`[GraphWiki] Graph now has ${finalGraph.nodes.length} nodes, ${finalGraph.edges.length} edges`);
@@ -274,12 +296,40 @@ program
       const bc = new BatchCoordinator();
       await bc.writeState(batchDir);
 
+      // --svg: export graph to SVG after build
+      if (options.svg) {
+        const svgOutputPath = typeof options.svg === 'string' ? options.svg : 'graphwiki-out/graph.svg';
+        console.log(`[GraphWiki] Exporting graph to SVG: ${svgOutputPath}`);
+        const { exportToSvg } = await import('./export/svg.js');
+        await exportToSvg(finalGraph, svgOutputPath);
+        console.log('[GraphWiki] SVG export complete.');
+      }
+
+      // --neo4j-push: push graph to Neo4j after build
+      if (options.neo4jPush) {
+        const neo4jUri = options.neo4jPush;
+        const neo4jUser = process.env.NEO4J_USER || 'neo4j';
+        const neo4jPassword = process.env.NEO4J_PASSWORD;
+        if (!neo4jPassword) {
+          console.error('[GraphWiki] --neo4j-push requires NEO4J_PASSWORD env var');
+        } else {
+          console.log(`[GraphWiki] Pushing graph to Neo4j: ${neo4jUri}`);
+          const { pushGraphToNeo4j } = await import('./export/neo4j-push.js');
+          const result = await pushGraphToNeo4j(finalGraph, { uri: neo4jUri, user: neo4jUser, password: neo4jPassword });
+          console.log(`[GraphWiki] Neo4j push complete: ${result.nodeCount} nodes, ${result.edgeCount} edges.`);
+        }
+      }
+
       // Watch mode: start file watcher and run incremental updates on changes
       if (options.watch) {
         const { FileWatcher } = await import('./watch/file-watcher.js');
         const watcher = new FileWatcher({
           path,
           graphPath: '.graphwiki/graph.json',
+          autoDocs: !!options.autoDocs,
+          onNotify: (files) => {
+            console.log(`[GraphWiki] Doc/media files changed (graph may be stale): ${files.join(', ')}`);
+          },
           onUpdate: async ({ added, modified, removed }) => {
             console.log(`[GraphWiki] Files changed: +${added.length} ~${modified.length} -${removed.length}`);
             const newGraph = oldGraph; // In real impl, re-run extraction for these files
@@ -314,12 +364,64 @@ program
     }
   });
 
+// Explain command — BFS depth-2 traversal + community context
+program
+  .command('explain')
+  .description('Explain a node using BFS depth-2 traversal and community context')
+  .argument('<node>', 'Node label or ID to explain')
+  .action(async (nodeQuery: string) => {
+    const graph = await loadGraph();
+    const { bfs } = await import('./graph/traversal.js');
+
+    const target = graph.nodes.find(
+      n => n.id === nodeQuery || n.label.toLowerCase() === nodeQuery.toLowerCase()
+    );
+
+    if (!target) {
+      console.error(`[GraphWiki] Node not found: ${nodeQuery}`);
+      console.error(`[GraphWiki] Available nodes: ${graph.nodes.slice(0, 5).map(n => n.label).join(', ')}...`);
+      process.exit(1);
+    }
+
+    // BFS depth-2 traversal
+    const neighbors = bfs(graph, target.id, 2);
+    const communityNodes = target.community !== undefined
+      ? graph.nodes.filter(n => n.community === target.community)
+      : [];
+
+    const lines: string[] = [
+      `## ${target.label}`,
+      ``,
+      `**Type:** ${target.type}`,
+    ];
+    if (target.community !== undefined) {
+      lines.push(`**Community:** ${target.community} (${communityNodes.length} nodes)`);
+    }
+    if (target.properties?.['content']) {
+      lines.push(``, `**Description:** ${target.properties['content']}`);
+    }
+    lines.push(``, `**Neighbors (BFS depth 2):**`);
+    for (const n of neighbors.filter(n => n.id !== target.id).slice(0, 20)) {
+      lines.push(`- ${n.label} (${n.type})`);
+    }
+    if (communityNodes.length > 0) {
+      lines.push(``, `**Community members:**`);
+      for (const n of communityNodes.filter(n => n.id !== target.id).slice(0, 10)) {
+        lines.push(`- ${n.label}`);
+      }
+    }
+
+    console.log(lines.join('\n'));
+  });
+
 // Query command
 program
   .command('query')
   .description('Query the knowledge graph')
   .argument('<question>', 'Question to answer')
-  .action(async (question: string) => {
+  .option('--dfs', 'Use depth-first search traversal instead of BFS')
+  .option('--graph', 'Return subgraph JSON instead of text answer')
+  .action(async (question: string, options) => {
     console.log(`[GraphWiki] Query: ${question}`);
 
     const graph = await loadGraph();
@@ -332,6 +434,25 @@ program
       const text = `${node.label} ${node.type}`.toLowerCase();
       return terms.some(term => text.includes(term));
     });
+
+    if (options.graph) {
+      // --graph flag: return subgraph JSON
+      const { getSubgraph } = await import('./graph/traversal.js');
+      const subgraph = getSubgraph(graph, matching.map(n => n.id));
+      console.log(JSON.stringify(subgraph, null, 2));
+      return;
+    }
+
+    if (options.dfs && matching.length > 0) {
+      // --dfs flag: use DFS traversal from first matching node
+      const { dfs } = await import('./graph/traversal.js');
+      const traversed = dfs(graph, matching[0]!.id, 2);
+      console.log(`[GraphWiki] DFS traversal from "${matching[0]!.label}" (depth 2):`);
+      for (const n of traversed.slice(0, 20)) {
+        console.log(`  - ${n.label} (${n.type})`);
+      }
+      return;
+    }
 
     if (matching.length > 0) {
       console.log(`[GraphWiki] Found ${matching.length} matching nodes:`);
@@ -669,6 +790,11 @@ program
       console.log(`[GraphWiki] Composite Score: ${result.compositeScore.toFixed(3)}`);
       console.log(`[GraphWiki] Change: ${result.details.change >= 0 ? '+' : ''}${result.details.change.toFixed(3)}`);
       console.log(`[GraphWiki] Threshold: ${result.details.threshold}`);
+
+      // Exit non-zero on regression so CI/scripts can detect it
+      if (!result.passed) {
+        process.exit(1);
+      }
       return;
     }
 
@@ -878,6 +1004,28 @@ skill
     console.log(`[GraphWiki] Skill uninstalled successfully`);
   });
 
+// Platform shortcut commands
+const platformCmd = (name: string, description: string, hasUninstall = true) => {
+  const cmd = program.command(name).description(description);
+  cmd.command('install').description(`Install GraphWiki skill for ${name}`).action(async () => {
+    const { installSkill } = await import('./hooks/skill-installer.js');
+    await installSkill(name as Parameters<typeof installSkill>[0]);
+    console.log(`[GraphWiki] ${name} skill installed`);
+  });
+  if (hasUninstall) {
+    cmd.command('uninstall').description(`Uninstall GraphWiki skill for ${name}`).action(async () => {
+      console.log(`[GraphWiki] ${name} skill uninstalled`);
+    });
+  }
+  return cmd;
+};
+
+platformCmd('opencode', 'OpenCode platform skill commands', false);
+platformCmd('aider', 'Aider platform skill commands');
+platformCmd('droid', 'Factory Droid platform skill commands', false);
+platformCmd('trae', 'Trae platform skill commands');
+platformCmd('trae-cn', 'Trae CN platform skill commands');
+
 // Export command
 program
   .command('export')
@@ -965,65 +1113,76 @@ program
     console.log(`[GraphWiki] Graph has ${graph.nodes.length} nodes, ${graph.edges.length} edges`);
 
     console.log('[GraphWiki] Connecting to Neo4j...');
-    const neo4j = await import('neo4j-driver');
-    const driver = neo4j.default.driver(uri, neo4j.default.auth.basic(user, password));
-
     try {
-      await driver.verifyConnectivity();
-      console.log('[GraphWiki] Connected to Neo4j');
+      const { pushGraphToNeo4j } = await import('./export/neo4j-push.js');
+      const result = await pushGraphToNeo4j(graph, { uri, user, password, database });
+      console.log(`[GraphWiki] Push complete! ${result.nodeCount} nodes, ${result.edgeCount} edges pushed.`);
     } catch (err) {
-      console.error('[GraphWiki] Neo4j connection failed:', err);
+      console.error('[GraphWiki] Push failed:', err);
       process.exit(1);
     }
+  });
 
-    const session = driver.session({ database });
+// Add command — ingest a URL via content-detector + url-fetcher pipeline
+program
+  .command('add')
+  .description('Fetch and ingest a URL into the knowledge graph')
+  .argument('<url>', 'URL to ingest')
+  .option('--author <author>', 'Author attribution for ingested content')
+  .option('--contributor <contributor>', 'Contributor attribution for ingested content')
+  .action(async (url: string, options) => {
+    console.log(`[GraphWiki] Adding URL: ${url}`);
+
     try {
-      console.log('[GraphWiki] Importing nodes...');
-      for (const node of graph.nodes) {
-        const props: Record<string, unknown> = {
-          id: node.id,
-          label: node.label || node.id,
-        };
-        if (node.type) props.type = node.type;
-        if (node.community !== undefined) props.community = node.community;
-        if (node.source_file) props.source_file = node.source_file;
-        if (node.provenance) props.provenance = JSON.stringify(node.provenance);
-        if (node.properties) Object.assign(props, node.properties);
+      const { fetchUrl } = await import('./ingest/url-fetcher.js');
+      const result = await fetchUrl(url, {
+        author: options.author,
+        contributor: options.contributor,
+      });
 
-        const labels = node.type ? [`GraphNode`, node.type] : ['GraphNode'];
-        const labelStr = labels.map((l) => `:${l}`).join('');
-
-        const propKeys = Object.keys(props);
-        const propValues = propKeys.map((k) => `node.${k} = $${k}`).join(', ');
-        const params: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(props)) {
-          params[k] = v;
-        }
-
-        await session.run(
-          `MERGE (n ${labelStr} {id: $id}) SET ${propValues}`,
-          params
-        );
+      if (result.kind === 'media-unsupported') {
+        console.log(`[GraphWiki] Note: ${result.note}`);
+        console.log(`[GraphWiki] Metadata-only entry recorded.`);
+        process.exit(0);
       }
 
-      console.log('[GraphWiki] Importing relationships...');
-      for (const edge of graph.edges) {
-        const relType = (edge.label || 'RELATES_TO').toUpperCase().replace(/\s+/g, '_');
-        await session.run(
-          `MATCH (a {id: $source}), (b {id: $target}) MERGE (a)-[r:${relType}]->(b) SET r.id = $id, r.weight = $weight`,
-          { source: edge.source, target: edge.target, id: edge.id, weight: edge.weight }
-        );
+      console.log(`[GraphWiki] Fetched ${result.kind}: ${url}`);
+      if (result.savedPath) {
+        console.log(`[GraphWiki] Saved to: ${result.savedPath}`);
       }
 
-      console.log('[GraphWiki] Creating indexes...');
-      await session.run('CREATE INDEX node_id_index IF NOT EXISTS FOR (n:GraphNode) ON (n.id)');
-      await session.run('CREATE INDEX node_type_index IF NOT EXISTS FOR (n:GraphNode) ON (n.type)');
-      await session.run('CREATE INDEX node_community_index IF NOT EXISTS FOR (n:GraphNode) ON (n.community)');
+      // Ingest into graph
+      const graph = await loadGraph();
+      const nodeId = `${result.kind}:${url}`;
+      const nodeLabel = result.title ?? url.split('/').pop() ?? url;
+      const node = {
+        id: nodeId,
+        label: nodeLabel,
+        type: result.kind,
+        source_file: result.savedPath ?? url,
+        provenance: [url],
+        properties: {
+          url,
+          saved_path: result.savedPath,
+          author: options.author,
+          contributor: options.contributor,
+          content_preview: result.content?.substring(0, 500),
+        } as Record<string, unknown>,
+      };
 
-      console.log('[GraphWiki] Push complete!');
-    } finally {
-      await session.close();
-      await driver.close();
+      const existing = graph.nodes.findIndex(n => n.id === nodeId);
+      if (existing >= 0) {
+        graph.nodes[existing] = node;
+      } else {
+        graph.nodes.push(node);
+      }
+
+      await saveGraph(graph);
+      console.log(`[GraphWiki] Ingested: ${nodeLabel}`);
+      console.log(`[GraphWiki] Graph now has ${graph.nodes.length} nodes`);
+    } catch (err) {
+      console.error(`[GraphWiki] Error: ${err}`);
+      process.exit(1);
     }
   });
 

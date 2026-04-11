@@ -217,4 +217,29 @@ describe('RefinementHistory', () => {
       expect(h).toBeInstanceOf(RefinementHistory);
     });
   });
+
+  // Required: ratchet history written
+  describe('ratchet history written', () => {
+    it('appending a ratchet entry persists it to history and can be retrieved', async () => {
+      const entry: import('../types.js').RefinementHistoryEntry = {
+        version: 'ratchet-v1',
+        timestamp: new Date().toISOString(),
+        promptDiff: 'Ratchet improvement: tightened confidence threshold',
+        diagnostics: [
+          { nodeId: 'node-A', nodeLabel: 'node-A', failureModes: ['low_confidence'], suggestedPrompts: ['add context'], estimatedImpact: 0.8 },
+        ],
+        validationScore: 0.82,
+      };
+
+      await history.append(entry);
+
+      const loaded = await history.getHistory();
+      const written = loaded.find(e => e.version === 'ratchet-v1');
+
+      // Ratchet history must be written and retrievable
+      expect(written).toBeDefined();
+      expect(written!.validationScore).toBe(0.82);
+      expect(written!.diagnostics.length).toBe(1);
+    });
+  });
 });

@@ -88,3 +88,18 @@ declare module "tree-sitter-bash" {
   const Bash: any;
   export = Bash;
 }
+
+declare module "tree-sitter-zig" {
+  const Zig: any;
+  export = Zig;
+}
+
+declare module "tree-sitter-ocaml" {
+  const OCaml: any;
+  export = OCaml;
+}
+
+declare module "tree-sitter-haskell" {
+  const Haskell: any;
+  export = Haskell;
+}

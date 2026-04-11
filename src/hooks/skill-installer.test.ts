@@ -175,7 +175,7 @@ describe('skill-installer', () => {
       await installHook();
 
       expect(vi.mocked(await import('fs/promises')).writeFile).toHaveBeenCalled();
-      const writtenContent = vi.mocked(vi.mocked(await import('fs/promises')).writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(vi.mocked(await import('fs/promises')).writeFile).mock.calls[0]![1] as string;
       const parsed = JSON.parse(writtenContent);
       // Should contain both existing and new hooks
       expect(parsed.hooks.pre_tool_use).toBeDefined();
@@ -331,7 +331,7 @@ describe('skill-installer', () => {
 
   describe('installAllSkills', () => {
     it('should install skills for detected platform', async () => {
-      const { installAllSkills, detectPlatform } = await import('./skill-installer.js');
+      const { installAllSkills } = await import('./skill-installer.js');
       vi.mocked(vi.mocked(await import('fs/promises')).access).mockRejectedValue(new Error('not found'));
       Object.defineProperty(process, 'env', {
         value: { HOME: '/home/user', ANTHROPIC_API_KEY: 'test', PATH: '/usr/bin' },

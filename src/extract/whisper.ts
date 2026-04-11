@@ -1,10 +1,12 @@
 // Whisper transcription for GraphWiki v2
 // Uses OpenAI Whisper API for audio/video transcription
+// Set WHISPER_BACKEND=mock to return fixture data (tests/fixtures/whisper-mock-transcript.json)
 
 import { unlinkSync, mkdtempSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, dirname } from 'path';
 import { tmpdir } from 'os';
 import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
 
 export interface TranscriptionResult {
   text: string;
@@ -13,13 +15,45 @@ export interface TranscriptionResult {
   tokens_used: number;
 }
 
+export interface TranscribeOptions {
+  mimeType?: string;
+  initialPrompt?: string;
+}
+
+/**
+ * Load mock transcript fixture. Used when WHISPER_BACKEND=mock.
+ */
+function loadMockTranscript(): TranscriptionResult {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const fixturePath = resolve(__dirname, '../../tests/fixtures/whisper-mock-transcript.json');
+  const raw = readFileSync(fixturePath, 'utf-8');
+  const data = JSON.parse(raw) as { text: string; language?: string; duration?: number; tokens_used?: number };
+  return {
+    text: data.text,
+    language: data.language,
+    duration: data.duration,
+    tokens_used: data.tokens_used ?? Math.ceil(data.text.split(/\s+/).length * 1.3),
+  };
+}
+
 /**
  * Transcribe audio file using OpenAI Whisper API
  */
 export async function transcribeAudioFile(
   audioFilePath: string,
-  mimeType = 'audio/webm',
+  mimeTypeOrOpts: string | TranscribeOptions = 'audio/webm',
 ): Promise<TranscriptionResult> {
+  const opts: TranscribeOptions = typeof mimeTypeOrOpts === 'string'
+    ? { mimeType: mimeTypeOrOpts }
+    : mimeTypeOrOpts;
+  const mimeType = opts.mimeType ?? 'audio/webm';
+
+  // Mock backend for testing
+  if (process.env.WHISPER_BACKEND === 'mock') {
+    return loadMockTranscript();
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY environment variable is not set');
@@ -33,6 +67,9 @@ export async function transcribeAudioFile(
   form.append('file', blob, 'audio.webm');
   form.append('model', 'whisper-1');
   form.append('response_format', 'verbose_json');
+  if (opts.initialPrompt) {
+    form.append('prompt', opts.initialPrompt);
+  }
 
   const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
@@ -66,7 +103,13 @@ export async function transcribeAudioFile(
  */
 export async function transcribeFromUrl(
   url: string,
+  opts?: TranscribeOptions,
 ): Promise<TranscriptionResult> {
+  // Mock backend: skip download entirely
+  if (process.env.WHISPER_BACKEND === 'mock') {
+    return loadMockTranscript();
+  }
+
   const tmpDir = mkdtempSync(join(tmpdir(), 'graphwiki-video-'));
   const audioPath = join(tmpDir, 'audio.webm');
 
@@ -80,10 +123,10 @@ export async function transcribeFromUrl(
       execSync(`curl -L -o "${audioPath}" "${url}"`, { stdio: 'pipe' });
     }
 
-    const result = await transcribeAudioFile(audioPath, 'audio/webm');
+    const result = await transcribeAudioFile(audioPath, { mimeType: 'audio/webm', ...opts });
     return result;
   } finally {
     try { unlinkSync(audioPath); } catch { /* ignore */ }
-    try { require('fs').rmSync(tmpDir, { recursive: true }); } catch { /* ignore */ }
+    try { (await import('fs')).rmSync(tmpDir, { recursive: true }); } catch { /* ignore */ }
   }
 }

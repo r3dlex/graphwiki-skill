@@ -26,6 +26,30 @@ const LANGUAGE_LOADERS: Record<string, LanguageLoader> = {
   lua: () => import("tree-sitter-lua"),
   elixir: () => import("tree-sitter-elixir"),
   bash: () => import("tree-sitter-bash"),
+  // Optional grammars — installed as optionalDependencies; gracefully skipped if absent.
+  // These packages use non-standard export shapes so we normalise them inline.
+  // tree-sitter-zig: exports the grammar directly (no Language wrapper)
+  zig: async () => {
+    const m = await import("tree-sitter-zig");
+    const lang = (m as unknown as Record<string, unknown>)["default"] ?? m;
+    return { Language: lang } as { Language: { new(): unknown } };
+  },
+  // tree-sitter-ocaml: exports { ocaml, ocaml_interface, ocaml_type }
+  ocaml: async () => {
+    const m = await import("tree-sitter-ocaml");
+    const lang = (m as unknown as Record<string, unknown>)["ocaml"]
+      ?? (m as unknown as Record<string, unknown>)["default"]
+      ?? m;
+    return { Language: lang } as { Language: { new(): unknown } };
+  },
+  // tree-sitter-haskell: exports { language, name, nodeTypeInfo }
+  haskell: async () => {
+    const m = await import("tree-sitter-haskell");
+    const lang = (m as unknown as Record<string, unknown>)["language"]
+      ?? (m as unknown as Record<string, unknown>)["default"]
+      ?? m;
+    return { Language: lang } as { Language: { new(): unknown } };
+  },
 };
 
 let parserCache: Map<string, unknown> = new Map();
@@ -49,8 +73,9 @@ async function initWasm(): Promise<void> {
       // web-tree-sitter auto-initializes WASM on import
       await import("web-tree-sitter");
       wasmInitialized = true;
-    } catch {
+    } catch (err) {
       // WASM init failed — fall back to native
+      console.warn("[graphwiki] WASM parser init failed; falling back to native backend.", err);
       wasmInitialized = false;
     }
   })();
@@ -102,6 +127,7 @@ export class TreeSitterFactory {
       c: "c", cpp: "cpp", "c-sharp": "c-sharp",
       ruby: "ruby", php: "php", swift: "swift",
       lua: "lua", elixir: "elixir", bash: "bash",
+      zig: "zig", ocaml: "ocaml", haskell: "haskell", hs: "haskell",
     };
     return langMap[language.toLowerCase()] ?? language.toLowerCase();
   }

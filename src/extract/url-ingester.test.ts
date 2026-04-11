@@ -1,6 +1,6 @@
 // Tests for url-ingester.ts
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 describe('url-ingester', () => {
   beforeEach(() => {

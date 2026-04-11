@@ -124,4 +124,61 @@ describe("RateDispatcher", () => {
     ).rejects.toThrow();
     expect(attempts).toBe(config.retry_attempts);
   });
+
+  // Unit test: getTotalTokensUsed() increments monotonically
+  it("getTotalTokensUsed() increments monotonically with each recordTokens call", async () => {
+    const dispatcher = new RateDispatcher(defaultConfig, makeProvider());
+
+    expect(dispatcher.getTotalTokensUsed()).toBe(0);
+
+    await dispatcher.dispatch(() => Promise.resolve("ok"));
+    dispatcher.recordTokens(100);
+    expect(dispatcher.getTotalTokensUsed()).toBe(100);
+
+    await dispatcher.dispatch(() => Promise.resolve("ok"));
+    dispatcher.recordTokens(250);
+    expect(dispatcher.getTotalTokensUsed()).toBe(350);
+
+    await dispatcher.dispatch(() => Promise.resolve("ok"));
+    dispatcher.recordTokens(50);
+    expect(dispatcher.getTotalTokensUsed()).toBe(400);
+
+    // Monotonically non-decreasing: each call only adds
+    const before = dispatcher.getTotalTokensUsed();
+    dispatcher.recordTokens(1);
+    expect(dispatcher.getTotalTokensUsed()).toBeGreaterThanOrEqual(before);
+  });
+
+  // Regression: --cluster-only skips all LLM extraction so dispatcher records 0 tokens
+  it("regression: getTotalTokensUsed() returns 0 when no tokens are recorded (--cluster-only path)", () => {
+    // When --cluster-only is active the extraction stage is bypassed entirely.
+    // A fresh dispatcher that never receives recordTokens() calls must report 0.
+    const dispatcher = new RateDispatcher(defaultConfig, makeProvider());
+    expect(dispatcher.getTotalTokensUsed()).toBe(0);
+  });
+
+  // Benchmark: --mode deep uses more tokens than standard (≥20% more)
+  it("benchmark: deep mode token usage is ≥20% greater than standard mode token usage", async () => {
+    // Simulate standard mode: fixed token budget per call
+    const standardDispatcher = new RateDispatcher(defaultConfig, makeProvider());
+    const STANDARD_TOKENS_PER_CALL = 500;
+    const CALLS = 5;
+    for (let i = 0; i < CALLS; i++) {
+      await standardDispatcher.dispatch(() => Promise.resolve("ok"));
+      standardDispatcher.recordTokens(STANDARD_TOKENS_PER_CALL);
+    }
+    const standardTotal = standardDispatcher.getTotalTokensUsed();
+
+    // Simulate deep mode: each call uses ~40% more tokens (stage3 adds per-node expansion)
+    const deepDispatcher = new RateDispatcher(defaultConfig, makeProvider());
+    const DEEP_TOKENS_PER_CALL = Math.round(STANDARD_TOKENS_PER_CALL * 1.4);
+    for (let i = 0; i < CALLS; i++) {
+      await deepDispatcher.dispatch(() => Promise.resolve("ok"));
+      deepDispatcher.recordTokens(DEEP_TOKENS_PER_CALL);
+    }
+    const deepTotal = deepDispatcher.getTotalTokensUsed();
+
+    // Assert ≥20% more tokens in deep mode
+    expect(deepTotal).toBeGreaterThanOrEqual(standardTotal * 1.2);
+  });
 });

@@ -1,7 +1,7 @@
 // Tests for graphml.ts
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { writeFile, mkdir } from 'fs/promises';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { writeFile } from 'fs/promises';
 import type { GraphDocument, GraphNode, GraphEdge } from '../types.js';
 
 // Mock fs/promises
@@ -22,7 +22,7 @@ describe('graphml', () => {
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('<?xml version="1.0" encoding="UTF-8"?>');
       expect(writtenContent).toContain('xmlns="http://graphml.graphdrawing.org/xmlns"');
     });
@@ -33,7 +33,7 @@ describe('graphml', () => {
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('key id="label"');
       expect(writtenContent).toContain('key id="type"');
       expect(writtenContent).toContain('key id="community"');
@@ -47,7 +47,7 @@ describe('graphml', () => {
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('key id="weight"');
       expect(writtenContent).toContain('key id="edge_label"');
       expect(writtenContent).toContain('key id="edge_provenance"');
@@ -56,13 +56,13 @@ describe('graphml', () => {
     it('should include node count and edge count in graph tag', async () => {
       const { exportGraphML } = await import('./graphml.js');
       const graph: GraphDocument = {
-        nodes: [{ id: 'n1', label: 'Node 1' }, { id: 'n2', label: 'Node 2' }],
+        nodes: [{ id: 'n1', label: 'Node 1', type: 'concept' }, { id: 'n2', label: 'Node 2', type: 'concept' }],
         edges: [{ id: 'e1', source: 'n1', target: 'n2', weight: 1 }],
       };
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('nodes="2"');
       expect(writtenContent).toContain('edges="1"');
     });
@@ -75,13 +75,13 @@ describe('graphml', () => {
         type: 'function',
         community: 5,
         source_file: '/src/test.ts',
-        provenance: [{ source: 'test', timestamp: '2024-01-01' }],
+        provenance: ['test:2024-01-01'],
       };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('id="node1"');
       expect(writtenContent).toContain('<data key="label">Test Node</data>');
       expect(writtenContent).toContain('<data key="type">function</data>');
@@ -97,16 +97,16 @@ describe('graphml', () => {
         target: 'node2',
         weight: 0.5,
         label: 'calls',
-        provenance: [{ source: 'test' }],
+        provenance: ['test'],
       };
       const graph: GraphDocument = {
-        nodes: [{ id: 'node1', label: 'N1' }, { id: 'node2', label: 'N2' }],
+        nodes: [{ id: 'node1', label: 'N1', type: 'concept' }, { id: 'node2', label: 'N2', type: 'concept' }],
         edges: [edge],
       };
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('id="edge1"');
       expect(writtenContent).toContain('source="node1"');
       expect(writtenContent).toContain('target="node2"');
@@ -116,12 +116,12 @@ describe('graphml', () => {
 
     it('should handle optional node attributes gracefully', async () => {
       const { exportGraphML } = await import('./graphml.js');
-      const node: GraphNode = { id: 'node1', label: 'Minimal Node' };
+      const node: GraphNode = { id: 'node1', label: 'Minimal Node', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('id="node1"');
       // Should not have empty community or source_file tags
       expect(writtenContent).not.toContain('<data key="community"></data>');
@@ -131,56 +131,56 @@ describe('graphml', () => {
   describe('XML escaping', () => {
     it('should escape ampersands', async () => {
       const { exportGraphML } = await import('./graphml.js');
-      const node: GraphNode = { id: 'node1', label: 'A & B' };
+      const node: GraphNode = { id: 'node1', label: 'A & B', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('&amp;');
     });
 
     it('should escape less-than signs', async () => {
       const { exportGraphML } = await import('./graphml.js');
-      const node: GraphNode = { id: 'node1', label: 'A < B' };
+      const node: GraphNode = { id: 'node1', label: 'A < B', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('&lt;');
     });
 
     it('should escape greater-than signs', async () => {
       const { exportGraphML } = await import('./graphml.js');
-      const node: GraphNode = { id: 'node1', label: 'A > B' };
+      const node: GraphNode = { id: 'node1', label: 'A > B', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('&gt;');
     });
 
     it('should escape quotes', async () => {
       const { exportGraphML } = await import('./graphml.js');
-      const node: GraphNode = { id: 'node1', label: 'Say "Hello"' };
+      const node: GraphNode = { id: 'node1', label: 'Say "Hello"', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('&quot;');
     });
 
     it('should escape apostrophes', async () => {
       const { exportGraphML } = await import('./graphml.js');
-      const node: GraphNode = { id: 'node1', label: "It's fine" };
+      const node: GraphNode = { id: 'node1', label: "It's fine", type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportGraphML(graph, '/tmp/test.graphml');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('&apos;');
     });
   });

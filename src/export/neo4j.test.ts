@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GraphDocument, GraphNode, GraphEdge } from '../types.js';
+import type { GraphDocument } from '../types.js';
 
 // Mock fs/promises
 vi.mock('fs/promises', () => ({
@@ -48,7 +48,7 @@ describe('neo4j export', () => {
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       expect(content).toContain("O\\'Reilly");
     });
 
@@ -65,7 +65,7 @@ describe('neo4j export', () => {
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       expect(content).toContain('community: 42');
     });
 
@@ -82,7 +82,7 @@ describe('neo4j export', () => {
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       expect(content).toContain('provenance');
     });
 
@@ -99,7 +99,7 @@ describe('neo4j export', () => {
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       expect(content).toContain('source_file');
     });
 
@@ -121,7 +121,7 @@ describe('neo4j export', () => {
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       expect(content).toContain('weight');
       expect(content).toContain('active');
     });
@@ -130,14 +130,14 @@ describe('neo4j export', () => {
       const { exportNeo4j } = await import('./neo4j.js');
 
       const graph: GraphDocument = {
-        nodes: [{ id: 'n1', label: 'Unknown' }],
+        nodes: [{ id: 'n1', label: 'Unknown', type: 'concept' }],
         edges: [],
       };
 
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       expect(content).toContain('GraphNode');
     });
   });
@@ -159,7 +159,7 @@ describe('neo4j export', () => {
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       expect(content).toContain('USES');
     });
 
@@ -185,7 +185,7 @@ describe('neo4j export', () => {
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       expect(content).toContain('provenance');
     });
 
@@ -205,7 +205,7 @@ describe('neo4j export', () => {
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       expect(content).toContain('RELATED_TO');
     });
   });
@@ -222,7 +222,7 @@ describe('neo4j export', () => {
       await exportNeo4j(graph, '/tmp/test.cypher');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
-      const content = writeFile.mock.calls[0][1] as string;
+      const content = writeFile.mock.calls[0]![1] as string;
       // Should be \' in the cypher
       expect(content).toContain("'test");
     });

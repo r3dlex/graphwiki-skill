@@ -146,15 +146,15 @@ describe("BatchCoordinator", () => {
       coordinator.markFailed("a.ts", "parse_error", "Error 2"); // Should be ignored
       const state = coordinator.getState();
       expect(state.failed).toHaveLength(1);
-      expect(state.failed[0].reason).toBe("timeout");
+      expect(state.failed[0]!.reason).toBe("timeout");
     });
 
     it("markSkipped returns early if file already skipped", () => {
       coordinator.markSkipped("a.ts", "empty");
-      coordinator.markSkipped("a.ts", "unsupported"); // Should be ignored
+      coordinator.markSkipped("a.ts", "unsupported_type"); // Should be ignored
       const state = coordinator.getState();
       expect(state.skipped).toHaveLength(1);
-      expect(state.skipped[0].reason).toBe("empty");
+      expect(state.skipped[0]!.reason).toBe("empty");
     });
 
     it("getState returns current state without mutation", () => {

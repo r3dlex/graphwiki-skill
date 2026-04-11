@@ -5,6 +5,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import type { GraphDocument } from '../types.js';
 import { glob } from 'glob';
 import { resolveIgnores } from '../util/ignore-resolver.js';
+import { classifyFile } from './classify-file.js';
 
 export interface WatchOptions {
   path: string;
@@ -14,6 +15,10 @@ export interface WatchOptions {
     removed: string[];
     modified: string[];
   }) => void;
+  /** Called when doc/media files change and --auto-docs is NOT set. */
+  onNotify?: (files: string[]) => void;
+  /** When true, doc files are routed to onUpdate instead of onNotify. */
+  autoDocs?: boolean;
   onError?: (err: Error) => void;
   debounceMs?: number;
 }
@@ -86,9 +91,17 @@ export class FileWatcher {
     const added: string[] = [];
     const modified: string[] = [];
     const removed: string[] = [];
+    const notifyFiles: string[] = [];
 
     for (const file of files) {
-      // Simple heuristic: check if file existed before
+      const kind = classifyFile(file);
+
+      if (kind === 'media' || (kind === 'doc' && !this.options.autoDocs)) {
+        notifyFiles.push(file);
+        continue;
+      }
+
+      // code, or doc with autoDocs → route to onUpdate
       if (this.oldGraph?.nodes.some((n) => n.source_file === file)) {
         modified.push(file);
       } else {
@@ -99,7 +112,13 @@ export class FileWatcher {
     this.pendingFiles.clear();
 
     console.log(`[GraphWiki] Detected ${files.length} file changes`);
-    this.options.onUpdate?.({ added, removed, modified });
+
+    if (notifyFiles.length > 0) {
+      this.options.onNotify?.(notifyFiles);
+    }
+    if (added.length > 0 || modified.length > 0 || removed.length > 0) {
+      this.options.onUpdate?.({ added, removed, modified });
+    }
   }
 
   async stop(): Promise<void> {

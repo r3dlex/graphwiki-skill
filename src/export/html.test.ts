@@ -1,7 +1,7 @@
 // Tests for html.ts
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { writeFile, mkdir } from 'fs/promises';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { writeFile } from 'fs/promises';
 import type { GraphDocument, GraphNode, GraphEdge } from '../types.js';
 
 // Mock fs/promises
@@ -22,7 +22,7 @@ describe('html', () => {
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('<!DOCTYPE html>');
       expect(writtenContent).toContain('<html lang="en">');
       expect(writtenContent).toContain('</html>');
@@ -34,7 +34,7 @@ describe('html', () => {
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('unpkg.com/vis-network');
     });
 
@@ -44,7 +44,7 @@ describe('html', () => {
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('id="graph"');
       expect(writtenContent).toContain('width: 100vw');
       expect(writtenContent).toContain('height: calc(100vh - 50px)');
@@ -56,7 +56,7 @@ describe('html', () => {
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('GraphWiki');
       expect(writtenContent).toContain('Toggle Physics');
       expect(writtenContent).toContain('Fit');
@@ -68,7 +68,7 @@ describe('html', () => {
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('id="details"');
       expect(writtenContent).toContain('Node Details');
     });
@@ -88,7 +88,7 @@ describe('html', () => {
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('id: "node1"');
       expect(writtenContent).toContain('label: "Test Node"');
       expect(writtenContent).toContain('type: "function"');
@@ -97,12 +97,12 @@ describe('html', () => {
 
     it('should handle community as null', async () => {
       const { exportHtml } = await import('./html.js');
-      const node: GraphNode = { id: 'node1', label: 'Test' };
+      const node: GraphNode = { id: 'node1', label: 'Test', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('community: -1');
     });
 
@@ -111,13 +111,14 @@ describe('html', () => {
       const node: GraphNode = {
         id: 'node1',
         label: 'Test',
-        provenance: [{ source: 'test', timestamp: '2024-01-01' }],
+        type: 'concept',
+        provenance: ['source:2024-01-01'],
       };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('provenance:');
       expect(writtenContent).toContain('source');
     });
@@ -134,13 +135,13 @@ describe('html', () => {
         label: 'calls',
       };
       const graph: GraphDocument = {
-        nodes: [{ id: 'node1', label: 'N1' }, { id: 'node2', label: 'N2' }],
+        nodes: [{ id: 'node1', label: 'N1', type: 'concept' }, { id: 'node2', label: 'N2', type: 'concept' }],
         edges: [edge],
       };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('from: "node1"');
       expect(writtenContent).toContain('to: "node2"');
       expect(writtenContent).toContain('value: 1.5');
@@ -156,13 +157,13 @@ describe('html', () => {
         weight: 1,
       };
       const graph: GraphDocument = {
-        nodes: [{ id: 'node1', label: 'N1' }, { id: 'node2', label: 'N2' }],
+        nodes: [{ id: 'node1', label: 'N1', type: 'concept' }, { id: 'node2', label: 'N2', type: 'concept' }],
         edges: [edge],
       };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('label: null');
     });
   });
@@ -172,9 +173,9 @@ describe('html', () => {
       const { exportHtml } = await import('./html.js');
       const graph: GraphDocument = {
         nodes: [
-          { id: 'n1', label: 'N1' },
-          { id: 'n2', label: 'N2' },
-          { id: 'n3', label: 'N3' },
+          { id: 'n1', label: 'N1', type: 'concept' },
+          { id: 'n2', label: 'N2', type: 'concept' },
+          { id: 'n3', label: 'N3', type: 'concept' },
         ],
         edges: [
           { id: 'e1', source: 'n1', target: 'n2', weight: 1 },
@@ -184,7 +185,7 @@ describe('html', () => {
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('3 nodes');
       expect(writtenContent).toContain('2 edges');
     });
@@ -193,17 +194,17 @@ describe('html', () => {
       const { exportHtml } = await import('./html.js');
       const graph: GraphDocument = {
         nodes: [
-          { id: 'n1', label: 'N1', community: 1 },
-          { id: 'n2', label: 'N2', community: 1 },
-          { id: 'n3', label: 'N3', community: 2 },
-          { id: 'n4', label: 'N4' }, // no community
+          { id: 'n1', label: 'N1', type: 'concept', community: 1 },
+          { id: 'n2', label: 'N2', type: 'concept', community: 1 },
+          { id: 'n3', label: 'N3', type: 'concept', community: 2 },
+          { id: 'n4', label: 'N4', type: 'concept' }, // no community
         ],
         edges: [],
       };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('3 communities');
     });
   });
@@ -211,56 +212,56 @@ describe('html', () => {
   describe('escapeString', () => {
     it('should escape backslashes', async () => {
       const { exportHtml } = await import('./html.js');
-      const node: GraphNode = { id: 'node1', label: 'Path\\to\\file' };
+      const node: GraphNode = { id: 'node1', label: 'Path\\to\\file', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('\\\\');
     });
 
     it('should escape double quotes', async () => {
       const { exportHtml } = await import('./html.js');
-      const node: GraphNode = { id: 'node1', label: 'Say "Hello"' };
+      const node: GraphNode = { id: 'node1', label: 'Say "Hello"', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('\\"');
     });
 
     it('should escape newlines', async () => {
       const { exportHtml } = await import('./html.js');
-      const node: GraphNode = { id: 'node1', label: 'Line1\nLine2' };
+      const node: GraphNode = { id: 'node1', label: 'Line1\nLine2', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('\\n');
     });
 
     it('should escape carriage returns', async () => {
       const { exportHtml } = await import('./html.js');
-      const node: GraphNode = { id: 'node1', label: 'Line1\rLine2' };
+      const node: GraphNode = { id: 'node1', label: 'Line1\rLine2', type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('\\r');
     });
 
     it('should escape single quotes', async () => {
       const { exportHtml } = await import('./html.js');
-      const node: GraphNode = { id: 'node1', label: "It's fine" };
+      const node: GraphNode = { id: 'node1', label: "It's fine", type: 'concept' };
       const graph: GraphDocument = { nodes: [node], edges: [] };
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain("\\'");
     });
   });
@@ -294,7 +295,7 @@ describe('html', () => {
 
       await exportHtml(graph, '/tmp/test.html');
 
-      const writtenContent = vi.mocked(writeFile).mock.calls[0][1] as string;
+      const writtenContent = vi.mocked(writeFile).mock.calls[0]![1] as string;
       expect(writtenContent).toContain('typeColors');
       expect(writtenContent).toContain('function');
       expect(writtenContent).toContain('e94560');

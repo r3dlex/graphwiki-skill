@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryRouter } from './router.js';
 import type { GraphDocument, LLMProvider } from '../types.js';
 import * as fs from 'fs';
-import * as path from 'path';
+
 
 const mockProvider: LLMProvider = {
   complete: vi.fn(),
@@ -15,7 +15,7 @@ const mockProvider: LLMProvider = {
 };
 
 vi.mock('../wiki/wiki-graph-map.js', () => ({
-  WikiGraphMap: vi.fn().mockImplementation(function (_path: string) {
+  WikiGraphMap: vi.fn().mockImplementation(function (this: { getPageForNode: ReturnType<typeof vi.fn> }, _path: string) {
     this.getPageForNode = vi.fn();
   }),
 }));
