@@ -4,7 +4,9 @@
 // Commander-based CLI with all commands
 
 import { Command } from 'commander';
-import { readFile, writeFile, readdir } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
+import { glob } from 'glob';
+import { resolveIgnores } from './util/ignore-resolver.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
@@ -131,12 +133,13 @@ program
 
     // Count source files
     let fileCount = 0;
-    try {
-      const files = await readdir(path);
-      fileCount = files.length;
-    } catch {
-      // Directory might not exist
-    }
+    const [ignorePatterns, _sources] = await resolveIgnores(path);
+    const discovered = await glob("**/*", {
+      cwd: path,
+      ignore: ignorePatterns,
+      absolute: false,
+    });
+    fileCount = discovered.length;
 
     console.log(`[GraphWiki] Found ${fileCount} files`);
     console.log(`[GraphWiki] Graph has ${graph.nodes.length} nodes, ${graph.edges.length} edges`);
