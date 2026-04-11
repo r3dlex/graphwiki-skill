@@ -36,18 +36,11 @@ jobs:
           grep "scope: 'src/serve/'" arch/rules/serve.rules.ts
           grep "scope: 'src/dedup/'" arch/rules/dedup.rules.ts
 
-      - name: Install archgate
-        run: npm install -g archgate
-
       - name: Initialize archgate project
-        run: archgate init
-
-      - name: Verify archgate CLI
-        run: |
-          archgate --version || { echo "archgate version check failed"; exit 1; }
+        run: pnpm exec archgate init
 
       - name: Run archgate check
-        run: archgate check --ci
+        run: pnpm exec archgate check --ci
 
   test:
     name: Tests
