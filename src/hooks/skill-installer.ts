@@ -1,10 +1,10 @@
 // Multi-platform skill installer for GraphWiki v2
-// Supports: claude, codex, auggie, gemini, cursor, openclaw
+// Supports: claude, codex, auggie, gemini, cursor, openclaw, opencode, aider, droid, trae, trae-cn
 
 import { writeFile, mkdir, readFile, access } from 'fs/promises';
 import { join, dirname } from 'path';
 
-export type Platform = 'claude' | 'codex' | 'auggie' | 'gemini' | 'cursor' | 'openclaw';
+export type Platform = 'claude' | 'codex' | 'auggie' | 'gemini' | 'cursor' | 'openclaw' | 'opencode' | 'aider' | 'droid' | 'trae' | 'trae-cn';
 
 /**
  * Skill definition
@@ -20,6 +20,36 @@ interface SkillDefinition {
  * GraphWiki skill definitions for each platform
  */
 const SKILL_DEFINITIONS: Record<Platform, SkillDefinition> = {
+  opencode: {
+    name: 'graphwiki',
+    description: 'GraphWiki integration for OpenCode',
+    prompt: `GraphWiki Knowledge Graph Integration\n\nUse graphwiki commands to query and navigate the knowledge base.\n\n- graphwiki build . --update\n- graphwiki query "question"\n- graphwiki path <nodeA> <nodeB>`,
+    tools: [],
+  },
+  aider: {
+    name: 'graphwiki',
+    description: 'GraphWiki integration for Aider',
+    prompt: `GraphWiki Knowledge Graph Integration\n\nUse graphwiki commands to query and navigate the knowledge base.\n\n- graphwiki build . --update\n- graphwiki query "question"\n- graphwiki path <nodeA> <nodeB>`,
+    tools: [],
+  },
+  droid: {
+    name: 'graphwiki',
+    description: 'GraphWiki integration for Factory Droid',
+    prompt: `GraphWiki Knowledge Graph Integration\n\nUse graphwiki commands to query and navigate the knowledge base.\n\n- graphwiki build . --update\n- graphwiki query "question"\n- graphwiki path <nodeA> <nodeB>`,
+    tools: [],
+  },
+  trae: {
+    name: 'graphwiki',
+    description: 'GraphWiki integration for Trae',
+    prompt: `GraphWiki Knowledge Graph Integration\n\nUse graphwiki commands to query and navigate the knowledge base.\n\n- graphwiki build . --update\n- graphwiki query "question"\n- graphwiki path <nodeA> <nodeB>`,
+    tools: [],
+  },
+  'trae-cn': {
+    name: 'graphwiki',
+    description: 'GraphWiki integration for Trae CN',
+    prompt: `GraphWiki Knowledge Graph Integration\n\nUse graphwiki commands to query and navigate the knowledge base.\n\n- graphwiki build . --update\n- graphwiki query "question"\n- graphwiki path <nodeA> <nodeB>`,
+    tools: [],
+  },
   claude: {
     name: 'graphwiki',
     description: 'Query and navigate the GraphWiki knowledge graph',
@@ -231,6 +261,20 @@ async function installOpenClawSkill(skillPath: string): Promise<void> {
 }
 
 /**
+ * Generic AGENTS.md installer (opencode, aider, droid, trae, trae-cn)
+ */
+async function installAgentsMdSkill(platform: Platform, skillPath: string, extraContent?: string): Promise<void> {
+  const skill = SKILL_DEFINITIONS[platform];
+  await mkdir(skillPath, { recursive: true });
+  const extra = extraContent ? `\n\n${extraContent}` : '';
+  await writeFile(
+    join(skillPath, 'AGENTS.md'),
+    `# ${skill.name}\n\n${skill.description}\n\n${skill.prompt}${extra}`,
+    'utf-8'
+  );
+}
+
+/**
  * Installer for Auggie (YAML frontmatter format)
  */
 async function installAuggieSkill(skillPath: string): Promise<void> {
@@ -371,6 +415,45 @@ export async function installSkill(
       await installAuggieSkill(base);
       await installAuggieHooks();
       return join(base, 'graphwiki');
+    },
+
+    opencode: async () => {
+      const base = installPath ?? join(process.cwd(), '.opencode');
+      // OpenCode: AGENTS.md + tool.execute.before hook in .opencode/config.json
+      await installAgentsMdSkill('opencode', base);
+      const configPath = join(base, 'config.json');
+      let config: Record<string, unknown> = {};
+      try { config = JSON.parse(await readFile(configPath, 'utf-8')); } catch {}
+      const hook = { command: 'node "$GRAPHWIKI_PROJECT_ROOT"/scripts/graphwiki-pretool.mjs' };
+      const existing = (config['tool'] as Record<string, unknown> | undefined) ?? {};
+      config['tool'] = { ...existing, execute: { before: hook } };
+      await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+      return join(base, 'AGENTS.md');
+    },
+
+    aider: async () => {
+      const base = installPath ?? process.cwd();
+      await installAgentsMdSkill('aider', base);
+      return join(base, 'AGENTS.md');
+    },
+
+    droid: async () => {
+      const base = installPath ?? join(process.cwd(), '.droid');
+      // Factory Droid: AGENTS.md + Task tool entry
+      await installAgentsMdSkill('droid', base, '## Task Tool\n\nGraphWiki is available as a task tool via `graphwiki` CLI commands.');
+      return join(base, 'AGENTS.md');
+    },
+
+    trae: async () => {
+      const base = installPath ?? join(process.cwd(), '.trae');
+      await installAgentsMdSkill('trae', base);
+      return join(base, 'AGENTS.md');
+    },
+
+    'trae-cn': async () => {
+      const base = installPath ?? join(process.cwd(), '.trae');
+      await installAgentsMdSkill('trae-cn', base);
+      return join(base, 'AGENTS.md');
     },
   };
 

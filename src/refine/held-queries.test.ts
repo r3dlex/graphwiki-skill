@@ -47,7 +47,7 @@ describe('held-queries', () => {
       const result = await loadHeldOutQueries(tempDir);
 
       expect(result).toHaveLength(2);
-      expect(result[0].query).toBe('test query 1');
+      expect(result[0]!.query).toBe('test query 1');
     });
 
     it('should return empty array if file does not exist', async () => {

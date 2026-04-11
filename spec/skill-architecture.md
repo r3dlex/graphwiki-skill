@@ -12,6 +12,9 @@ SKILL.md  →  skill-generator.ts  →  SKILL-claude.md
                                 →  SKILL-gemini.md
                                 →  SKILL-cursor.md
                                 →  SKILL-openclaw.md
+                                →  SKILL-windsurf.md
+                                →  SKILL-cody.md
+                                →  SKILL-codewhisperer.md
 ```
 
 ## SKILL.md (Canonical Source)

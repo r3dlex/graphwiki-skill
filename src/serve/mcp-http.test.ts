@@ -226,7 +226,7 @@ describe('mcp-http', () => {
 
     it('should update context via setContext', () => {
       const graph: GraphDocument = { nodes: [], edges: [] };
-      const newGraph: GraphDocument = { nodes: [{ id: 'n1' }], edges: [] };
+      const newGraph: GraphDocument = { nodes: [{ id: 'n1', label: 'n1', type: 'concept' }], edges: [] };
       const { setContext } = createMcpServer(graph);
 
       setContext(newGraph, [{ title: 'Updated', content: 'New content' }]);

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { ExtractionCache } from "./extraction-cache.js";
 import * as fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -153,7 +153,7 @@ describe("ExtractionCache", () => {
     await cache.updateManifest(entry2);
 
     const manifest = await cache.getManifest();
-    expect(manifest["hash456"].node_count).toBe(10);
-    expect(manifest["hash456"].size_bytes).toBe(2048);
+    expect(manifest["hash456"]!.node_count).toBe(10);
+    expect(manifest["hash456"]!.size_bytes).toBe(2048);
   });
 });

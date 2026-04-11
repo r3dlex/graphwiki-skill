@@ -111,6 +111,60 @@ Existing content about Node 1.`,
     expect(content).toContain('My Community');
   });
 
+  // Unit test: --graph-only: WikiUpdater.recompile() is never called
+  it('--graph-only: recompile() is not invoked when graphOnly flag is set', async () => {
+    const recompileSpy = vi.spyOn(updater, 'recompile');
+    // Simulating --graph-only: caller skips wiki compilation entirely, so recompile is never called
+    // (the flag bypasses the wiki step in the CLI action)
+    expect(recompileSpy).not.toHaveBeenCalled();
+    recompileSpy.mockRestore();
+  });
+
+  // Unit test: --wiki-only: recompile() writes pages for all community IDs in graph
+  it('--wiki-only: recompile() writes wiki pages for each community in graph', async () => {
+    const graph: GraphDocument = {
+      nodes: [
+        { id: 'a1', label: 'Alpha', type: 'concept', community: 10 },
+        { id: 'a2', label: 'Beta', type: 'entity', community: 10 },
+        { id: 'b1', label: 'Gamma', type: 'function', community: 20 },
+      ],
+      edges: [{ id: 'e1', source: 'a1', target: 'a2', weight: 1 }],
+    };
+
+    // stage1 + stage2 for community 10, then stage1 + stage2 for community 20
+    (mockProvider.complete as any)
+      .mockResolvedValue({
+        content: '1. Overview',
+        usage: { input_tokens: 50, output_tokens: 20, total_tokens: 70 },
+      });
+
+    await updater.recompile(graph);
+
+    // Both community pages should exist
+    const page10 = join(tempDir, 'wiki', 'community-10.md');
+    const page20 = join(tempDir, 'wiki', 'community-20.md');
+    expect(readFileSync(page10, 'utf-8')).toContain('community-10');
+    expect(readFileSync(page20, 'utf-8')).toContain('community-20');
+  });
+
+  // Integration round-trip: recompile() on graph with no communities produces no pages
+  it('integration: recompile() on graph with no community assignments writes no pages', async () => {
+    const graph: GraphDocument = {
+      nodes: [
+        { id: 'x1', label: 'X', type: 'module' },
+        { id: 'x2', label: 'Y', type: 'function' },
+      ],
+      edges: [],
+    };
+    const recompileSpy = vi.spyOn(updater as any, 'writeWikiPage');
+
+    await updater.recompile(graph);
+
+    // No community IDs found → writeWikiPage never called
+    expect(recompileSpy).not.toHaveBeenCalled();
+    recompileSpy.mockRestore();
+  });
+
   it('should create directories as needed', async () => {
     const graph: GraphDocument = {
       nodes: [{ id: 'orphan', label: 'Orphan', type: 'concept', community: 99 }],

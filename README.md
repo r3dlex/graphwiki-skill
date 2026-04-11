@@ -2,7 +2,7 @@
 
 ![Banner](assets/banner.png)
 
-> **LLM knowledge graph with persistent wiki compilation** — TypeScript, TDD 90%+, dual-transport MCP
+> **LLM knowledge graph with persistent wiki compilation** — TypeScript, 703 tests (80% line coverage), dual-transport MCP
 
 ---
 
@@ -13,7 +13,7 @@
 - **Dual-Transport MCP** — stdio + HTTP servers for Claude Code integration
 - **Context Loading Protocol** — token-efficient retrieval with tiered loading
 - **AST + Embedding Deduplication** — no redundant LLM calls
-- **TDD 90%+** — 409 tests across 41 test files
+- **TDD 90% lines / 85% branches / 80% functions** — 703 tests across 59 test files
 
 ---
 
@@ -122,7 +122,7 @@ GraphWiki measures token usage per query. The `graphwiki benchmark` command repo
 graphwiki benchmark "How does authentication work?"
 ```
 
-**Typical token savings:**
+**Typical token savings (estimated):**
 
 | Query Type | Without GraphWiki | With GraphWiki | Savings |
 |------------|------------------|----------------|---------|
@@ -142,9 +142,13 @@ GraphWiki uses a canonical skill pipeline where [SKILL.md](SKILL.md) is the sing
 SKILL.md  →  skill-generator.ts  →  SKILL-claude.md
                                     SKILL-codex.md
                                     SKILL-copilot.md
+                                    SKILL-auggie.md
                                     SKILL-gemini.md
                                     SKILL-cursor.md
                                     SKILL-openclaw.md
+                                    SKILL-windsurf.md
+                                    SKILL-cody.md
+                                    SKILL-codewhisperer.md
 ```
 
 - **SKILL.md** is the canonical source with YAML frontmatter and markdown sections
@@ -215,6 +219,9 @@ Install GraphWiki for your platform:
 | Gemini | `graphwiki skill install --platform gemini` |
 | Cursor | `graphwiki skill install --platform cursor` |
 | OpenClaw | `graphwiki skill install --platform openclaw` |
+| WindSurf | Manual: copy `SKILL-windsurf.md` to WindSurf config |
+| Cody | Manual: copy `SKILL-cody.md` to Cody config |
+| CodeWhisperer | Manual: copy `SKILL-codewhisperer.md` to CodeWhisperer config |
 | GitHub Copilot | Copy `SKILL-copilot.md` to `.github/copilot/` |
 
 For full skill documentation, see [SKILL.md](SKILL.md).

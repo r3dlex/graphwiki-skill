@@ -239,4 +239,24 @@ describe('Ratchet', () => {
       expect(r).toBeInstanceOf(Ratchet);
     });
   });
+
+  // Required: validate exits non-zero on regression
+  describe('validate exits non-zero on regression', () => {
+    it('validate() returns passed=false on regression — CLI should exit(1)', () => {
+      const tuningScores: QueryScore[] = [
+        { query: 'q1', confidence: 0.9, efficiency: 0.9, tier: 3, tokens: 100 },
+      ];
+      // Validation scores drop well below threshold (regression)
+      const validationScores: QueryScore[] = [
+        { query: 'q1', confidence: 0.2, efficiency: 0.2, tier: 1, tokens: 9000 },
+      ];
+
+      const result = ratchet.validate(tuningScores, validationScores);
+
+      // Ratchet failed — caller (CLI --validate) must exit(1)
+      expect(result.passed).toBe(false);
+      expect(result.compositeScore).toBeLessThan(ratchet.getThreshold());
+      expect(result.details.change).toBeLessThan(0);
+    });
+  });
 });

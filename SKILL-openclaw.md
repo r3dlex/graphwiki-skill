@@ -36,4 +36,4 @@ hard_constraints: |
   - **Maximum 3 wiki pages** per query (token budget)
   - **Protocol order** -- Steps 1-5 required for manual context loading
 
-platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer, opencode, aider, droid, trae, trae-cn]

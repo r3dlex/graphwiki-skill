@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GraphDocument, GraphNode } from '../types.js';
+import type { GraphDocument } from '../types.js';
 
 // Mock fs/promises
 vi.mock('fs/promises', () => ({
@@ -60,7 +60,7 @@ describe('obsidian export', () => {
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
       const calls = writeFile.mock.calls.filter(c => (c[0] as string).includes('nodes'));
-      const content = calls[0][1] as string;
+      const content = calls[0]![1] as string;
 
       expect(content).toContain('---');
       expect(content).toContain('id: n1');
@@ -80,7 +80,7 @@ describe('obsidian export', () => {
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
       const calls = writeFile.mock.calls.filter(c => (c[0] as string).includes('nodes'));
-      const content = calls[0][1] as string;
+      const content = calls[0]![1] as string;
 
       expect(content).toContain('community: 42');
     });
@@ -97,7 +97,7 @@ describe('obsidian export', () => {
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
       const calls = writeFile.mock.calls.filter(c => (c[0] as string).includes('nodes'));
-      const content = calls[0][1] as string;
+      const content = calls[0]![1] as string;
 
       expect(content).toContain('provenance:');
       expect(content).toContain('source1.md');
@@ -111,14 +111,14 @@ describe('obsidian export', () => {
           { id: 'n1', label: 'AI', type: 'concept' },
           { id: 'n2', label: 'ML', type: 'concept' },
         ],
-        edges: [{ id: 'e1', source: 'n1', target: 'n2', label: 'includes' }],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2', label: 'includes', weight: 1 }],
       };
 
       await exportObsidian(graph, '/tmp/vault');
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
       const calls = writeFile.mock.calls.filter(c => (c[0] as string).includes('nodes'));
-      const content = calls[0][1] as string;
+      const content = calls[0]![1] as string;
 
       expect(content).toContain('## Calls / References');
       expect(content).toContain('[[ML]]');
@@ -132,7 +132,7 @@ describe('obsidian export', () => {
           { id: 'n1', label: 'AI', type: 'concept' },
           { id: 'n2', label: 'ML', type: 'concept' },
         ],
-        edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2', weight: 1 }],
       };
 
       await exportObsidian(graph, '/tmp/vault');
@@ -165,7 +165,7 @@ describe('obsidian export', () => {
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
       const calls = writeFile.mock.calls.filter(c => (c[0] as string).includes('nodes'));
-      const content = calls[0][1] as string;
+      const content = calls[0]![1] as string;
 
       expect(content).toContain('## Properties');
       expect(content).toContain('accuracy');
@@ -183,7 +183,7 @@ describe('obsidian export', () => {
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
       const calls = writeFile.mock.calls.filter(c => (c[0] as string).includes('nodes'));
-      const content = calls[0][1] as string;
+      const content = calls[0]![1] as string;
 
       expect(content).toContain('## Source');
       expect(content).toContain('/path/to/file.md');
@@ -205,7 +205,7 @@ describe('obsidian export', () => {
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
       const calls = writeFile.mock.calls.filter(c => (c[0] as string).includes('nodes'));
-      const content = calls[0][1] as string;
+      const content = calls[0]![1] as string;
 
       expect(content).toContain('## Community');
       // Should reference other nodes in same community
@@ -368,7 +368,7 @@ describe('obsidian export', () => {
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
       const calls = writeFile.mock.calls.filter(c => (c[0] as string).includes('nodes'));
-      const filename = calls[0][0] as string;
+      const filename = calls[0]![0] as string;
 
       expect(filename).not.toContain('<');
       expect(filename).not.toContain('>');
@@ -388,7 +388,7 @@ describe('obsidian export', () => {
 
       const { writeFile } = vi.mocked(await import('fs/promises'));
       const calls = writeFile.mock.calls.filter(c => (c[0] as string).includes('nodes'));
-      const filename = calls[0][0] as string;
+      const filename = calls[0]![0] as string;
 
       // Length should be limited (100 chars + .md extension)
       expect(filename.length).toBeLessThanOrEqual(120);

@@ -59,13 +59,18 @@ The `files` field in `package.json` controls what is included in the npm package
 {
   "files": [
     "dist",
+    "lib",
     "SKILL.md",
     "SKILL-claude.md",
     "SKILL-codex.md",
     "SKILL-copilot.md",
+    "SKILL-auggie.md",
     "SKILL-gemini.md",
     "SKILL-cursor.md",
     "SKILL-openclaw.md",
+    "SKILL-windsurf.md",
+    "SKILL-cody.md",
+    "SKILL-codewhisperer.md",
     "scripts"
   ]
 }
@@ -74,14 +79,18 @@ The `files` field in `package.json` controls what is included in the npm package
 | Path | Purpose |
 |------|---------|
 | `dist/` | Compiled JavaScript + TypeScript declarations |
-| `SKILL.md` | Canonical skill source (canonical source) |
+| `SKILL.md` | Canonical skill source |
 | `SKILL-claude.md` | Claude Code skill file |
 | `SKILL-codex.md` | OpenAI Codex skill file |
 | `SKILL-copilot.md` | GitHub Copilot skill file |
 | `SKILL-gemini.md` | Google Gemini skill file |
 | `SKILL-cursor.md` | Cursor skill file (JSON) |
 | `SKILL-openclaw.md` | OpenClaw skill file (YAML) |
-| `scripts/` | Hook scripts for oh-my-claude integration |
+| `SKILL-auggie.md` | Auggie skill file |
+| `SKILL-windsurf.md` | WindSurf skill file |
+| `SKILL-cody.md` | Cody skill file |
+| `SKILL-codewhisperer.md` | CodeWhisperer skill file |
+| `scripts/` | Hook scripts for skill integration |
 
 **Not included:** `src/`, `tests/`, `spec/`, `*.ts` source files.
 
@@ -165,7 +174,7 @@ graphwiki skill install --platform copilot
 
 ## CI Configuration
 
-GitHub Actions workflow (`.github/workflows/release.yml`):
+GitHub Actions workflow (`.github/workflows/ci.yml` — the release job is the `release` job at lines 137-157):
 
 ```yaml
 name: Release

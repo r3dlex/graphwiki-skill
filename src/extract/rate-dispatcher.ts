@@ -35,6 +35,9 @@ export class RateDispatcher {
   private latencySumMs = 0;
   private latencyCount = 0;
 
+  // Lifetime total tokens recorded across all calls
+  private lifetimeTokens = 0;
+
   constructor(config: DispatcherConfig, _provider?: LLMProvider) {
     this.config = config;
   }
@@ -135,9 +138,10 @@ export class RateDispatcher {
   }
 
   /**
-   * Update token count for rate calculation.
+   * Update token count for rate calculation and lifetime tracking.
    */
   recordTokens(tokenCount: number): void {
+    this.lifetimeTokens += tokenCount;
     if (this.tokenCounts.length > 0) {
       this.tokenCounts[this.tokenCounts.length - 1] = tokenCount;
     }
@@ -147,6 +151,14 @@ export class RateDispatcher {
     const recentTokens = this.tokenCounts.slice(-recentCalls.length);
     const totalTokens = recentTokens.reduce((s, n) => s + n, 0);
     this.metrics.tokens_per_minute = totalTokens;
+  }
+
+  /**
+   * Returns the total number of tokens recorded across all dispatch calls
+   * for the lifetime of this dispatcher instance.
+   */
+  getTotalTokensUsed(): number {
+    return this.lifetimeTokens;
   }
 
   getState(): DispatcherState {

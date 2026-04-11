@@ -8,7 +8,6 @@ import {
   JSONRPC_ERROR_CODES,
   createMcpServer,
 } from './mcp-stdio.js';
-import type { MCPRequest, MCPResponse } from '../types.js';
 
 // Mock process.stdin and process.stdout
 const mockStdin = {
@@ -283,7 +282,7 @@ describe('mcp-stdio', () => {
 
     it('should update context via setContext', () => {
       const graph = { nodes: [], edges: [] };
-      const newGraph = { nodes: [{ id: 'n1' }], edges: [] };
+      const newGraph = { nodes: [{ id: 'n1', label: 'n1', type: 'concept' }], edges: [] };
       const { setContext } = createMcpServer(graph);
 
       expect(() => setContext(newGraph, [{ title: 'Updated', content: 'New content' }])).not.toThrow();

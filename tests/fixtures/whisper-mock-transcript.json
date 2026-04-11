@@ -1,0 +1,26 @@
+{
+  "text": "This is a mock transcript for testing purposes. It contains three segments of audio content.",
+  "language": "en",
+  "duration": 15.5,
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 4.5,
+      "text": "This is a mock transcript for testing purposes."
+    },
+    {
+      "id": 1,
+      "start": 4.5,
+      "end": 9.8,
+      "text": "It contains three segments of audio content."
+    },
+    {
+      "id": 2,
+      "start": 9.8,
+      "end": 15.5,
+      "text": "Used by MEDIA-01 through MEDIA-06 test cases."
+    }
+  ],
+  "tokens_used": 42
+}

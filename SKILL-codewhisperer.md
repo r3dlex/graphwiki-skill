@@ -2,7 +2,7 @@
 name: graphwiki
 version: 2.0.0
 description: LLM knowledge graph with persistent wiki compilation
-platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer]
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot, windsurf, cody, codewhisperer, opencode, aider, droid, trae, trae-cn]
 ---
 
 # graphwiki

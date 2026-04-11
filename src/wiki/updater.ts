@@ -117,6 +117,34 @@ export class WikiUpdater {
     writeFileSync(fullPath, fmLines + page.content, 'utf-8');
   }
 
+  /**
+   * Full recompile: regenerate all wiki pages from the existing graph without
+   * running extraction. Used by the --wiki-only build flag.
+   */
+  async recompile(graph: GraphDocument): Promise<void> {
+    // Derive communities from node.community assignments
+    const communityIds = new Set<number>();
+    for (const node of graph.nodes) {
+      if (node.community !== undefined) {
+        communityIds.add(node.community);
+      }
+    }
+
+    for (const communityId of communityIds) {
+      const communityNodes = graph.nodes.filter(n => n.community === communityId);
+      const communityEdges = graph.edges.filter(
+        e => communityNodes.some(n => n.id === e.source) && communityNodes.some(n => n.id === e.target),
+      );
+      const meta: CommunityMeta = {
+        id: communityId,
+        node_count: communityNodes.length,
+        label: `community-${communityId}`,
+      };
+      const page = await this.compiler.compileCommunity(meta, communityNodes, communityEdges);
+      await this.writeWikiPage(page);
+    }
+  }
+
   private getNodePagePath(nodeId: string): string {
     return join(this.wikiDir, 'nodes', `${nodeId}.md`);
   }
