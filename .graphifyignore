@@ -1,0 +1,7 @@
+# GraphWiki — Graph output ignores
+graphwiki-out/
+.wiki/
+dist/
+.cache/
+*.graph.json
+*.graphml

@@ -251,6 +251,39 @@ platforms: [${frontmatter.platforms.join(', ')}]
 `;
 }
 
+function generateAuggie(parsed: ParsedSkill): string {
+  // YAML frontmatter format for Auggie skill at .augment/skills/graphwiki/SKILL.md
+  const { frontmatter, sections } = parsed;
+
+  const protocol = sections.get('Context Loading Protocol') ?? '';
+  const commands = sections.get('Available Commands') ?? '';
+  const constraints = sections.get('Hard Constraints') ?? '';
+
+  return `---
+name: ${frontmatter.name}
+version: ${frontmatter.version}
+description: ${frontmatter.description}
+platforms: [${frontmatter.platforms.join(', ')}]
+---
+
+# ${frontmatter.name}
+
+${frontmatter.description}
+
+## Context Loading Protocol
+
+${protocol}
+
+## Available Commands
+
+${commands}
+
+## Hard Constraints
+
+${constraints}
+`;
+}
+
 // ============================================================
 // Hook JSON Generator
 // ============================================================
@@ -297,6 +330,7 @@ async function generateAllFiles(parsed: ParsedSkill): Promise<void> {
     { name: 'SKILL-gemini.md', content: generateGemini(parsed) },
     { name: 'SKILL-cursor.md', content: generateCursor(parsed) },
     { name: 'SKILL-openclaw.md', content: generateOpenClaw(parsed) },
+    { name: 'SKILL-auggie.md', content: generateAuggie(parsed) },
   ];
 
   for (const file of files) {
@@ -318,6 +352,7 @@ async function checkFilesMatch(parsed: ParsedSkill): Promise<boolean> {
     { name: 'SKILL-gemini.md', content: generateGemini(parsed) },
     { name: 'SKILL-cursor.md', content: generateCursor(parsed) },
     { name: 'SKILL-openclaw.md', content: generateOpenClaw(parsed) },
+    { name: 'SKILL-auggie.md', content: generateAuggie(parsed) },
   ];
 
   let allMatch = true;

@@ -53,10 +53,22 @@ All hook scripts live in `scripts/`:
 
 ```
 scripts/
-  graphwiki-pretool.mjs        # PreToolUse hook entry point
-  graphwiki-session-start.mjs   # SessionStart hook entry point
-  graphwiki-posttool.mjs        # PostToolUse hook entry point
+  graphwiki-pretool.mjs              # OMC PreToolUse hook
+  graphwiki-session-start.mjs        # OMC SessionStart hook
+  graphwiki-posttool.mjs             # OMC PostToolUse hook
+  graphwiki-auggie-pretool.mjs       # Auggie PreToolUse hook
+  graphwiki-auggie-session-start.mjs  # Auggie SessionStart hook
+  graphwiki-auggie-posttool.mjs      # Auggie PostToolUse hook
 ```
+
+### OMC vs Auggie Differences
+
+| Aspect | OMC (Claude Code) | Auggie |
+|--------|------------------|--------|
+| Registration | `~/.claude/plugins/marketplaces/omc/hooks/hooks.json` | `~/.augment/settings.json` |
+| Event field | `session_id` | `conversation_id` |
+| PreToolUse blocking | Never blocks | Exit code 2 = blocking |
+| Event format | snake_case | snake_case |
 
 ## PreToolUse Behavior
 
@@ -174,6 +186,62 @@ The `generateHooksJsonEntries()` function in `skill-generator.ts` produces this 
 │  Session End                                         │
 └─────────────────────────────────────────────────────┘
 ```
+
+## Auggie Hook Architecture
+
+Auggie uses a different registration path and event format. Hooks are registered via `~/.augment/settings.json` rather than OMC's hooks.json.
+
+### Auggie Event Format
+
+```json
+{
+  "tool_name": "Read",
+  "tool_input": { "file_path": "/src/Auth.ts" },
+  "conversation_id": "abc123",
+  "workspace_roots": ["/project"]
+}
+```
+
+Key differences from OMC:
+- Uses `conversation_id` instead of `session_id`
+- Adds `workspace_roots` array
+- `matcher` uses `launch-process` instead of `*`
+
+### Auggie Hook Registration
+
+```json
+{
+  "pre_tool_use": [{
+    "matcher": "launch-process",
+    "hooks": [{
+      "type": "command",
+      "command": "node \"$GRAPHWIKI_PROJECT_ROOT\"/scripts/graphwiki-auggie-pretool.mjs"
+    }]
+  }],
+  "session_start": [{
+    "matcher": "launch-process",
+    "hooks": [{
+      "type": "command",
+      "command": "node \"$GRAPHWIKI_PROJECT_ROOT\"/scripts/graphwiki-auggie-session-start.mjs"
+    }]
+  }],
+  "post_tool_use": [{
+    "matcher": "launch-process",
+    "hooks": [{
+      "type": "command",
+      "command": "node \"$GRAPHWIKI_PROJECT_ROOT\"/scripts/graphwiki-auggie-posttool.mjs"
+    }]
+  }]
+}
+```
+
+### Blocking Behavior
+
+- **Exit code 0-1**: Non-blocking, tool proceeds
+- **Exit code 2**: Blocking, tool is blocked
+- **Exit code 3+**: Non-blocking
+
+GraphWiki hooks always exit 0 (non-blocking) to maintain compatibility.
 
 ## Testing Hooks
 

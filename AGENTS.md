@@ -65,17 +65,15 @@ Every page in wiki/ has YAML frontmatter:
 
 ## Agent Role Matrix
 
-| Agent | Role | Tools | Protocol |
-|-------|------|-------|----------|
-| oma-explorer | codebase-search | bash, read, glob, grep | Context Loading Protocol |
-| oma-analyst | requirements | read, bash | Drift detection, wiki consistency |
-| oma-planner | planning | read, bash, write | GraphWiki context for planning |
-| oma-executor | implementation | bash, read, edit, glob, write | GraphWiki command execution |
-| oma-verifier | verification | bash, read | graphwiki lint, coverage validation |
-| oma-qa | testing | bash, write, read | Test execution, QA cycling |
-| oma-writer | documentation | read, write | Wiki page creation, updates |
-| oma-security | security review | bash, read | Vulnerability scanning |
-| oma-debugger | debugging | bash, read | Log analysis, issue diagnosis |
+GraphWiki is platform-agnostic. The host tool (Claude Code, Codex, Auggie, etc.) maps GraphWiki capabilities to its own agent system. Use the Context Loading Protocol and Commands to integrate GraphWiki into any agent workflow.
+
+| Role | GraphWiki Integration |
+|------|---------------------|
+| codebase-search | Use `graphwiki path <term1> <term2>` to find structural relationships before reading files |
+| requirements | Use `graphwiki query "<question>"` to load relevant wiki pages before analysis |
+| planning | Use `graphwiki status` to check drift and `graphwiki lint` for consistency |
+| implementation | Use `graphwiki build . --update` after file changes to keep graph current |
+| verification | Use `graphwiki lint` and `graphwiki status` to validate changes |
 
 ## Tool Access Levels
 

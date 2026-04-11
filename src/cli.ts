@@ -473,7 +473,7 @@ const skill = program.command('skill').description('Skill management commands');
 skill
   .command('install')
   .description('Install GraphWiki skill for your platform')
-  .option('--platform <p>', 'Platform: claude, codex, gemini, cursor, openclaw, copilot')
+  .option('--platform <p>', 'Platform: claude, codex, auggie, gemini, cursor, openclaw, copilot')
   .option('--hooks', 'Also install PreToolUse hooks', false)
   .action(async (options) => {
     const platform = options.platform || 'claude';

@@ -2,7 +2,7 @@
 name: graphwiki
 version: 2.0.0
 description: LLM knowledge graph with persistent wiki compilation
-platforms: [claude, codex, gemini, cursor, openclaw, copilot]
+platforms: [claude, codex, auggie, gemini, cursor, openclaw, copilot]
 ---
 
 # GraphWiki Skill
@@ -76,13 +76,15 @@ When the PreToolUse hook provides insufficient context, follow this manual proto
 
 ## Agent Role Matrix
 
-| Agent | Role | Tools | Protocol |
-|-------|------|-------|----------|
-| oma-explorer | codebase-search | bash, read, glob, grep | Context Loading Protocol |
-| oma-analyst | requirements | read, bash | Drift detection, wiki consistency |
-| oma-planner | planning | read, bash, write | GraphWiki context for planning |
-| oma-executor | implementation | bash, read, edit, glob, write | GraphWiki command execution |
-| oma-verifier | verification | bash, read | graphwiki lint, coverage validation |
+GraphWiki is platform-agnostic. The host tool maps GraphWiki capabilities to its own agent system:
+
+| Role | GraphWiki Integration |
+|------|---------------------|
+| codebase-search | Use `graphwiki path <term1> <term2>` to find structural relationships before reading files |
+| requirements | Use `graphwiki query "<question>"` to load relevant wiki pages before analysis |
+| planning | Use `graphwiki status` to check drift and `graphwiki lint` for consistency |
+| implementation | Use `graphwiki build . --update` after file changes to keep graph current |
+| verification | Use `graphwiki lint` and `graphwiki status` to validate changes |
 
 ## Hard Constraints
 
@@ -104,9 +106,11 @@ Wiki pages have YAML frontmatter:
 - **Cursor:** `graphwiki skill install --platform cursor`
 - **OpenClaw:** `graphwiki skill install --platform openclaw`
 - **GitHub Copilot:** copy SKILL-copilot.md to `.github/copilot/`
-- **Auggie:** Research pending -- **excluded from v2**. Auggie's hook API is undocumented and requires separate research before integration.
+- **Auggie:** `graphwiki skill install --platform auggie` (writes to `~/.augment/settings.json`)
 
 ## PreToolUse Hook Integration (for skill installer)
+
+### OMC (Claude Code, Codex)
 
 The skill installer registers these hooks via oh-my-claude's hooks.json:
 
@@ -121,12 +125,29 @@ The skill installer registers these hooks via oh-my-claude's hooks.json:
 }]
 ```
 
+### Auggie
+
+The skill installer registers Auggie hooks via `~/.augment/settings.json`:
+
+```json
+"pre_tool_use": [{
+  "matcher": "launch-process",
+  "hooks": [{
+    "type": "command",
+    "command": "node \"$GRAPHWIKI_PROJECT_ROOT\"/scripts/graphwiki-auggie-pretool.mjs"
+  }]
+}]
+```
+
+Exit code 2 = blocking; other exit codes non-blocking. Events use snake_case: `tool_name`, `tool_input`, `conversation_id`, `workspace_roots`.
+
 ## Generator
 
 `skill-generator.ts` parses this file and generates:
 - SKILL-claude.md
 - SKILL-codex.md
-- SKILL-copilot.md
+- SKILL-auggie.md
 - SKILL-gemini.md
 - SKILL-cursor.md
 - SKILL-openclaw.md
+- SKILL-copilot.md

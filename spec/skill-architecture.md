@@ -8,6 +8,7 @@ GraphWiki uses a **canonical source pipeline** where `SKILL.md` is the single so
 SKILL.md  →  skill-generator.ts  →  SKILL-claude.md
                                 →  SKILL-codex.md
                                 →  SKILL-copilot.md
+                                →  SKILL-auggie.md
                                 →  SKILL-gemini.md
                                 →  SKILL-cursor.md
                                 →  SKILL-openclaw.md
@@ -61,6 +62,7 @@ if (!inCodeBlock && /^#{1,3}\s+(.+)/.test(line)) {
 | **Claude** | Full markdown with YAML frontmatter | All sections (raw content) |
 | **Codex** | Abbreviated markdown | Context Loading Protocol, Available Commands, Hard Constraints |
 | **Copilot** | Restructured markdown | How to Use (= Protocol), Commands, Rules (= Constraints) |
+| **Auggie** | YAML frontmatter markdown | Context Loading Protocol, Available Commands, Hard Constraints |
 | **Gemini** | Plain text (uppercase headers, no markdown) | CONTEXT LOADING PROTOCOL, COMMANDS, HARD CONSTRAINTS |
 | **Cursor** | JSON | contextLoadingProtocol, commands, hardConstraints fields |
 | **OpenClaw** | YAML | context_loading_protocol, commands, hard_constraints |
@@ -91,6 +93,11 @@ if (!inCodeBlock && /^#{1,3}\s+(.+)/.test(line)) {
 - YAML with snake_case field names
 - Multi-line strings using `|` block scalars
 
+### Auggie (SKILL-auggie.md)
+- YAML frontmatter with markdown body
+- Same sections as Codex (protocol, commands, constraints)
+- Installed to `~/.augment/skills/graphwiki/SKILL.md`
+
 ## Hook Integration Model
 
 GraphWiki uses the PreToolUse hook (managed by oh-my-claude) for automatic context enrichment.
@@ -119,6 +126,28 @@ The skill installer writes to `~/.claude/plugins/marketplaces/omc/hooks/hooks.js
 ### Graceful Degradation
 
 If graphwiki CLI is unavailable, hooks log a warning and return `{ "continue": true }`. Tool execution always proceeds regardless of hook outcome.
+
+## Auggie Skill Installation
+
+GraphWiki integrates with Auggie via `~/.augment/settings.json` hooks and `~/.augment/skills/graphwiki/SKILL.md`.
+
+### Auggie Installation Path
+
+```bash
+graphwiki skill install --platform auggie
+```
+
+This writes:
+- `~/.augment/skills/graphwiki/SKILL.md` — skill definition (generated from SKILL-auggie.md)
+- `~/.augment/settings.json` — hook registrations
+
+### Auggie vs OMC Hooks
+
+| Aspect | OMC | Auggie |
+|--------|-----|--------|
+| Hooks file | `~/.claude/plugins/marketplaces/omc/hooks/hooks.json` | `~/.augment/settings.json` |
+| Event field | `session_id` | `conversation_id` |
+| PreToolUse blocking | Never (exit code ignored) | Exit code 2 = blocking |
 
 ## File Generation Commands
 

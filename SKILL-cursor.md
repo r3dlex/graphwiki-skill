@@ -8,6 +8,7 @@
   "platforms": [
     "claude",
     "codex",
+    "auggie",
     "gemini",
     "cursor",
     "openclaw",

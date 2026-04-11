@@ -1,12 +1,12 @@
 // Multi-platform skill installer for GraphWiki v2
-// Supports: claude, codex, gemini, cursor, openclaw
+// Supports: claude, codex, auggie, gemini, cursor, openclaw
 
 import { writeFile, mkdir, readFile, access } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 
-export type Platform = 'claude' | 'codex' | 'gemini' | 'cursor' | 'openclaw';
+export type Platform = 'claude' | 'codex' | 'auggie' | 'gemini' | 'cursor' | 'openclaw';
 
 /**
  * Skill definition
@@ -121,6 +121,30 @@ graphwiki status
 Add to your OpenClaw configuration for automatic context.`,
     tools: [],
   },
+
+  auggie: {
+    name: 'graphwiki',
+    description: 'GraphWiki integration for Auggie',
+    prompt: `GraphWiki Knowledge Graph Integration
+
+**Purpose:** Navigate and query the GraphWiki knowledge base
+
+**Commands:**
+- graphwiki build . --update    # Incremental rebuild
+- graphwiki query "question"   # Ask questions
+- graphwiki status             # Show stats
+- graphwiki path <nodeA> <nodeB>  # Find path between nodes
+
+**Protocol:**
+1. Check graphwiki-out/GRAPH_REPORT.md first
+2. Use graphwiki path for structural navigation
+3. Follow wiki page links for context
+4. Query results should update wiki/
+
+**Hook Integration:**
+GraphWiki hooks into Auggie via ~/.augment/settings.json for automatic context loading before each tool use.`,
+    tools: [],
+  },
 };
 
 /**
@@ -209,6 +233,80 @@ async function installOpenClawSkill(skillPath: string): Promise<void> {
 }
 
 /**
+ * Installer for Auggie (YAML frontmatter format)
+ */
+async function installAuggieSkill(skillPath: string): Promise<void> {
+  const skill = SKILL_DEFINITIONS.auggie;
+
+  // Auggie skill goes to ~/.augment/skills/graphwiki/SKILL.md
+  const auggieSkillPath = join(skillPath, 'graphwiki');
+  await mkdir(auggieSkillPath, { recursive: true });
+
+  const content = `---
+name: ${skill.name}
+description: ${skill.description}
+---
+
+# ${skill.name}
+
+${skill.description}
+
+## Prompt
+
+${skill.prompt}
+`;
+
+  await writeFile(join(auggieSkillPath, 'SKILL.md'), content, 'utf-8');
+}
+
+/**
+ * Install Auggie hooks to ~/.augment/settings.json
+ */
+async function installAuggieHooks(): Promise<void> {
+  const auggieSettingsPath = join(process.env.HOME ?? '.', '.augment', 'settings.json');
+
+  const auggieHooks = {
+    pre_tool_use: [{
+      matcher: 'launch-process',
+      hooks: [{
+        type: 'command',
+        command: 'node "$GRAPHWIKI_PROJECT_ROOT"/scripts/graphwiki-auggie-pretool.mjs',
+      }],
+    }],
+    session_start: [{
+      matcher: 'launch-process',
+      hooks: [{
+        type: 'command',
+        command: 'node "$GRAPHWIKI_PROJECT_ROOT"/scripts/graphwiki-auggie-session-start.mjs',
+      }],
+    }],
+    post_tool_use: [{
+      matcher: 'launch-process',
+      hooks: [{
+        type: 'command',
+        command: 'node "$GRAPHWIKI_PROJECT_ROOT"/scripts/graphwiki-auggie-posttool.mjs',
+      }],
+    }],
+  };
+
+  // Read existing settings or create new
+  let existing: Record<string, unknown> = {};
+  try {
+    const content = await readFile(auggieSettingsPath, 'utf-8');
+    existing = JSON.parse(content);
+  } catch {
+    // File doesn't exist, start fresh
+  }
+
+  // Merge auggie hooks
+  existing = { ...existing, ...auggieHooks };
+
+  await mkdir(dirname(auggieSettingsPath), { recursive: true });
+  await writeFile(auggieSettingsPath, JSON.stringify(existing, null, 2), 'utf-8');
+  console.log(`[GraphWiki] Auggie hooks installed to ${auggieSettingsPath}`);
+}
+
+/**
  * Detect current platform
  */
 export async function detectPlatform(): Promise<Platform> {
@@ -268,6 +366,13 @@ export async function installSkill(
       const base = installPath ?? join(process.cwd(), '.openclaw', 'skills');
       await installOpenClawSkill(base);
       return join(base, 'graphwiki.yaml');
+    },
+
+    auggie: async () => {
+      const base = join(process.env.HOME ?? '.', '.augment', 'skills');
+      await installAuggieSkill(base);
+      await installAuggieHooks();
+      return join(base, 'graphwiki');
     },
   };
 
