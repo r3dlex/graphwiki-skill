@@ -39,9 +39,18 @@ interface GraphWikiPaths {
   driftLog: string;
 }
 
+interface GraphWikiWiki {
+  format: 'obsidian' | 'plain';
+}
+
 interface GraphWikiConfig {
   paths: GraphWikiPaths;
+  wiki: GraphWikiWiki;
 }
+
+const DEFAULT_WIKI: GraphWikiWiki = {
+  format: 'obsidian',
+};
 
 const DEFAULT_PATHS: GraphWikiPaths = {
   graph: '.graphwiki/graph.json',
@@ -56,12 +65,16 @@ async function loadConfig(): Promise<GraphWikiConfig> {
   const configPath = '.graphwiki/config.json';
   try {
     const content = await readFile(configPath, 'utf-8');
-    const raw = JSON.parse(content) as Partial<{ paths: Partial<GraphWikiPaths> }>;
+    const raw = JSON.parse(content) as Partial<{
+      paths: Partial<GraphWikiPaths>;
+      wiki: Partial<GraphWikiWiki>;
+    }>;
     return {
       paths: { ...DEFAULT_PATHS, ...(raw.paths ?? {}) },
+      wiki: { ...DEFAULT_WIKI, ...(raw.wiki ?? {}) },
     };
   } catch {
-    return { paths: { ...DEFAULT_PATHS } };
+    return { paths: { ...DEFAULT_PATHS }, wiki: { ...DEFAULT_WIKI } };
   }
 }
 
@@ -295,7 +308,10 @@ program
         const { WikiUpdater } = await import('./wiki/updater.js');
         const { WikiCompiler } = await import('./wiki/compiler.js');
         const provider = null as unknown as import('./types.js').LLMProvider; // no LLM needed for recompile
-        const compiler = new WikiCompiler(provider, { mode: options.mode ?? 'standard' });
+        const compiler = new WikiCompiler(provider, {
+          mode: options.mode ?? 'standard',
+          format: config.wiki.format,
+        });
         const updater = new WikiUpdater(config.paths.wiki, compiler);
         const pages = await compiler.compileAll(
           [...new Set(finalGraph.nodes.filter(n => n.community !== undefined).map(n => n.community as number))].map(id => ({
