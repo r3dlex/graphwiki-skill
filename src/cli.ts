@@ -4,7 +4,7 @@
 // Commander-based CLI with all commands
 
 import { Command } from 'commander';
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile, stat } from 'fs/promises';
 import { glob } from 'glob';
 import { resolveIgnoresSplit } from './util/ignore-resolver.js';
 import { join, dirname } from 'path';
@@ -18,6 +18,8 @@ import { createRefinementHistory } from './refine/history.js';
 import { loadHeldOutQueries } from './refine/held-queries.js';
 import type { IncrementalBuildResult, QueryScore } from './types.js';
 import { exportObsidian } from './export/obsidian.js';
+import { ASTExtractor } from './extract/ast-extractor.js';
+import { detectLanguage } from './detect/detector.js';
 
 // Get package version
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -162,6 +164,75 @@ function findShortestPath(graph: GraphDocument, nodeA: string, nodeB: string): s
 }
 
 // ============================================================
+// Extraction Helper
+// ============================================================
+
+/**
+ * Extract nodes and edges from source files using AST (tree-sitter).
+ * Zero LLM dependency — works offline with no API keys.
+ */
+async function extractGraph(
+  files: string[],
+  basePath: string
+): Promise<GraphDocument> {
+  const LANG_NORMALIZE: Record<string, string> = {
+    'C#': 'c-sharp',
+    'C++': 'cpp',
+  };
+  const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+  const BATCH_SIZE = 50;
+
+  const astExtractor = new ASTExtractor();
+  const allNodes: GraphDocument['nodes'] = [];
+  const allEdges: GraphDocument['edges'] = [];
+
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    const batch = files.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map(async (file) => {
+        const fullPath = join(basePath, file);
+        // Skip files > 1MB (generated code, binaries)
+        try {
+          const { size } = await stat(fullPath);
+          if (size > MAX_FILE_SIZE) return null;
+        } catch { return null; }
+
+        const lang = detectLanguage(file);
+        if (!lang) return null;
+
+        const normalizedLang = LANG_NORMALIZE[lang] ?? lang;
+        const content = await readFile(fullPath, 'utf-8');
+        const { nodes, edges } = await astExtractor.extract(content, normalizedLang, file);
+
+        // Set source_file on every node (required by .graphifyignore filter and downstream consumers)
+        for (const node of nodes) {
+          (node as GraphDocument['nodes'][0]).source_file = file;
+        }
+
+        return { nodes, edges };
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) {
+        allNodes.push(...(result.value.nodes as GraphDocument['nodes']));
+        allEdges.push(...(result.value.edges as GraphDocument['edges']));
+      }
+    }
+
+    if ((i + BATCH_SIZE) % 1000 === 0 || i + BATCH_SIZE >= files.length) {
+      console.log(`[GraphWiki] Extracted ${Math.min(i + BATCH_SIZE, files.length)}/${files.length} files...`);
+    }
+  }
+
+  return {
+    nodes: allNodes,
+    edges: allEdges,
+    metadata: { directed: false },
+  };
+}
+
+// ============================================================
 // CLI Commands
 // ============================================================
 
@@ -248,6 +319,22 @@ program
       let finalGraph = oldGraph;
       let _incrementalResult: IncrementalBuildResult | null = null;
 
+      // AST extraction — runs for full builds and incremental updates
+      // Skip when --wiki-only or --cluster-only (those reuse the existing graph)
+      if (!options.wikiOnly && !options.clusterOnly) {
+        console.log('[GraphWiki] Extracting graph from source files...');
+        finalGraph = await extractGraph(discovered, path);
+        console.log(`[GraphWiki] Extraction complete: ${finalGraph.nodes.length} nodes, ${finalGraph.edges.length} edges`);
+      }
+
+      // --mode deep warning
+      if (options.mode === 'deep') {
+        const hasProvider = !!(process.env['ANTHROPIC_API_KEY'] || process.env['OPENAI_API_KEY'] || process.env['GOOGLE_API_KEY']);
+        if (!hasProvider) {
+          console.warn('[GraphWiki] --mode deep: no LLM provider found (ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY). Proceeding with AST-only extraction.');
+        }
+      }
+
       // D4: Orphaned-assignment recovery — check for stale subagent assignments on resume
       const batchDir = `${graphwikiDir}/batch`;
       if (options.resume) {
@@ -291,11 +378,26 @@ program
           logPath: config.paths.driftLog,
         });
 
-        // Placeholder: in Phase A this would call the real extraction pipeline
-        // For now, compute delta against the loaded graph
-        const newGraph = oldGraph; // In real implementation, newGraph would come from extraction
-        if (oldGraph.nodes.length > 0) {
-          const delta = computeDelta(oldGraph, newGraph);
+        // Incremental: only extract files not already in the graph (by provenance)
+        const existingFiles = new Set(
+          oldGraph.nodes.flatMap(n => n.provenance ?? []).filter(Boolean)
+        );
+        const newFiles = discovered.filter(f => !existingFiles.has(f));
+
+        if (newFiles.length > 0) {
+          console.log(`[GraphWiki] Incremental: extracting ${newFiles.length} new files...`);
+          const newGraph = await extractGraph(newFiles, path);
+          // Merge new nodes/edges into finalGraph
+          finalGraph = {
+            ...finalGraph,
+            nodes: [...finalGraph.nodes, ...newGraph.nodes],
+            edges: [...finalGraph.edges, ...newGraph.edges],
+            metadata: finalGraph.metadata,
+          };
+        }
+
+        if (finalGraph.nodes.length > 0) {
+          const delta = computeDelta(oldGraph, finalGraph);
           persistDelta(delta, config.paths.deltas);
           console.log(`[GraphWiki] Delta: ${delta.added.nodes.length} added, ${delta.removed.nodes.length} removed, ${delta.modified.length} modified`);
           console.log(`[GraphWiki] DriftDetector initialized (run count: ${_driftDetector.getRunCount()})`);
@@ -446,11 +548,21 @@ program
           },
           onUpdate: async ({ added, modified, removed }) => {
             console.log(`[GraphWiki] Files changed: +${added.length} ~${modified.length} -${removed.length}`);
-            const newGraph = oldGraph; // In real impl, re-run extraction for these files
-            if (oldGraph.nodes.length > 0) {
-              const delta = computeDelta(oldGraph, newGraph);
-              persistDelta(delta, config.paths.deltas);
-              console.log(`[GraphWiki] Delta: ${delta.added.nodes.length} added, ${delta.removed.nodes.length} removed`);
+            const changedFiles = [...added, ...modified];
+            if (changedFiles.length > 0) {
+              const currentGraph = await loadGraph(config.paths.graph);
+              const newGraph = await extractGraph(changedFiles, path);
+              const removedSet = new Set(removed);
+              const mergedGraph: GraphDocument = {
+                ...currentGraph,
+                nodes: [...currentGraph.nodes.filter(n => !removedSet.has(n.source_file ?? '')), ...newGraph.nodes],
+                edges: [...currentGraph.edges, ...newGraph.edges],
+                metadata: currentGraph.metadata,
+              };
+              await saveGraph(mergedGraph, config.paths.graph);
+              const computedDelta = computeDelta(currentGraph, mergedGraph);
+              persistDelta(computedDelta, config.paths.deltas);
+              console.log(`[GraphWiki] Delta: ${computedDelta.added.nodes.length} added, ${computedDelta.removed.nodes.length} removed`);
             }
           },
           onError: (err) => {
