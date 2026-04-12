@@ -154,5 +154,22 @@ describe('FileWatcher', () => {
     expect(onNotify).toHaveBeenCalled();
     expect(onUpdate).not.toHaveBeenCalled();
   });
+
+  // unlink-removed: unlink event routes file to removed array
+  it('unlink-removed: unlink event routes file to removed array in onUpdate', async () => {
+    watcher = new FileWatcher({ path: '/test', onUpdate, onError });
+    await watcher.start();
+
+    const watcherAny = watcher as any;
+    watcherAny.onEvent('unlink', 'src/old-file.ts');
+    await new Promise(r => setTimeout(r, 600));
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ removed: ['src/old-file.ts'] }),
+    );
+    const call = onUpdate.mock.calls[0][0];
+    expect(call.added).toHaveLength(0);
+    expect(call.modified).toHaveLength(0);
+  });
 });
 

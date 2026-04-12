@@ -27,7 +27,7 @@ export class FileWatcher {
   private watcher: FSWatcher | null = null;
   private options: WatchOptions;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  private pendingFiles: Set<string> = new Set();
+  private pendingFiles: Map<string, 'add' | 'change' | 'unlink'> = new Map();
   private oldGraph: GraphDocument | null = null;
 
   constructor(options: WatchOptions) {
@@ -79,7 +79,7 @@ export class FileWatcher {
   }
 
   private onEvent(_event: 'add' | 'change' | 'unlink', file: string): void {
-    this.pendingFiles.add(file);
+    this.pendingFiles.set(file, _event);
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => this.flush(), this.options.debounceMs!);
   }
@@ -87,13 +87,18 @@ export class FileWatcher {
   private flush(): void {
     if (this.pendingFiles.size === 0) return;
 
-    const files = [...this.pendingFiles];
+    const files = [...this.pendingFiles.entries()];
     const added: string[] = [];
     const modified: string[] = [];
     const removed: string[] = [];
     const notifyFiles: string[] = [];
 
-    for (const file of files) {
+    for (const [file, event] of files) {
+      if (event === 'unlink') {
+        removed.push(file);
+        continue;
+      }
+
       const kind = classifyFile(file);
 
       if (kind === 'media' || (kind === 'doc' && !this.options.autoDocs)) {
