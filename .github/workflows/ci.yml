@@ -149,6 +149,10 @@ jobs:
     concurrency:
       group: publish-${{ github.ref }}
       cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write  # npm OIDC provenance + GitHub Packages GITHUB_TOKEN
+      packages: write  # GitHub Packages
     steps:
       - uses: actions/checkout@v4
         with:
@@ -238,30 +242,74 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish
+      - name: Mutate package.json version
         if: steps.guard.outputs.skip != 'true'
+        id: mutate
         run: |
           set -e
           PUBLISH_VERSION="${{ steps.version.outputs.publish_version }}"
-
-          # Override version in package.json at publish-time only (never committed back)
           PUBLISH_VERSION="$PUBLISH_VERSION" node -e "
             const fs = require('fs');
             const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             p.version = process.env.PUBLISH_VERSION;
             fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
           "
+          if [[ "$PUBLISH_VERSION" == *"-alpha."* ]]; then
+            echo "tag=alpha" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
 
-          if [[ "$PUBLISH_VERSION" == *"-alpha."* ]]; then TAG="alpha"; else TAG="latest"; fi
+      - name: Publish to npmjs.com (Option B — OIDC provenance)
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          set -e
+          PUBLISH_VERSION="${{ steps.version.outputs.publish_version }}"
+          TAG="${{ steps.mutate.outputs.tag }}"
 
-          pnpm publish --no-git-checks --tag "$TAG" || {
+          # --provenance attaches SLSA attestation via OIDC (id-token: write)
+          # Auth: uses NPM_TOKEN if set; otherwise relies on npm Trusted Publishers OIDC
+          # One-time setup required on npmjs.com → Settings → Trusted Publishers
+          pnpm publish --no-git-checks --tag "$TAG" --provenance || {
             EC=$?
-            # Treat already-published as idempotent success (handles registry propagation lag)
             if npm view "graphwiki@${PUBLISH_VERSION}" version 2>/dev/null | grep -q "${PUBLISH_VERSION}"; then
-              echo "::warning::Version ${PUBLISH_VERSION} already on npm — idempotent success"
+              echo "::warning::graphwiki@${PUBLISH_VERSION} already on npmjs.com — idempotent success"
+              exit 0
+            fi
+            if [ -z "$NODE_AUTH_TOKEN" ]; then
+              echo "::warning::NPM_TOKEN not set and OIDC Trusted Publisher not configured — skipping npmjs.com publish"
+              echo "  → One-time setup: npmjs.com → graphwiki → Settings → Trusted Publishers → Add GitHub Actions"
               exit 0
             fi
             exit $EC
           }
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to GitHub Packages (Option A — zero secrets)
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          set -e
+          PUBLISH_VERSION="${{ steps.version.outputs.publish_version }}"
+          TAG="${{ steps.mutate.outputs.tag }}"
+
+          # Scope the package for GitHub Packages (@r3dlex/graphwiki)
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            p.name = '@r3dlex/graphwiki';
+            p.publishConfig = { registry: 'https://npm.pkg.github.com', access: 'public' };
+            fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+
+          pnpm publish --no-git-checks --tag "$TAG" || {
+            EC=$?
+            if npm view "@r3dlex/graphwiki@${PUBLISH_VERSION}" --registry https://npm.pkg.github.com version 2>/dev/null | grep -q "${PUBLISH_VERSION}"; then
+              echo "::warning::@r3dlex/graphwiki@${PUBLISH_VERSION} already on GitHub Packages — idempotent success"
+              exit 0
+            fi
+            exit $EC
+          }
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
