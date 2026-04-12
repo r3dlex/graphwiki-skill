@@ -43,6 +43,47 @@ Return a JSON object with this exact shape:
 Extract all functions, classes, modules, interfaces, and types. Create edges for calls, imports, extends, implements, uses relationships.
 Only return valid JSON — no markdown fences, no commentary.`;
 
+/**
+ * Deep mode system prompt — instructs the LLM to find non-obvious relationships,
+ * cross-domain analogies, implicit patterns, and speculative connections.
+ * Nodes and edges extracted in deep mode should use lower confidence scores
+ * (INFERRED or AMBIGUOUS) to reflect their speculative nature.
+ */
+const DEEP_MODE_SYSTEM_PROMPT = `You are an advanced code analysis assistant operating in DEEP mode. Given source code, extract a knowledge graph that goes beyond surface-level relationships. In addition to explicit calls, imports, and inheritance:
+
+- Find NON-OBVIOUS relationships: shared abstractions, implicit dependencies, semantic similarities across modules
+- Identify CROSS-DOMAIN analogies: patterns that mirror concepts from other domains (e.g., a retry loop that mirrors exponential backoff from networking)
+- Surface IMPLICIT patterns: architectural conventions, emergent behaviors, latent coupling between components
+- Include SPECULATIVE connections: weak signals and low-confidence edges that hint at possible relationships even if not directly provable from the code alone
+- Use confidence_level "INFERRED" for relationships you can reason about from context, and "AMBIGUOUS" for speculative or weak connections
+
+Return a JSON object with this exact shape:
+{
+  "id": "unique-document-id",
+  "nodes": [
+    {
+      "id": "node-id",
+      "type": "function | class | module | interface | type | concept | entity | rationale | document | comparison | decision",
+      "label": "display label",
+      "content": "optional description or docstring",
+      "confidence_level": "EXTRACTED | INFERRED | AMBIGUOUS",
+      "source": "file path"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-id",
+      "source": "node-id",
+      "target": "node-id",
+      "relation": "calls | imports | uses | defines | implements | extends | overrides | instantiates | semantically_similar_to | related_to | contradicts | supersedes | depends_on | rationale_for | alternative_to",
+      "confidence_level": "EXTRACTED | INFERRED | AMBIGUOUS"
+    }
+  ]
+}
+
+Be aggressive: a speculative edge with confidence_level "AMBIGUOUS" is more valuable than a missed relationship. Aim for connections with confidence in the 0.3–0.6 range where direct evidence is weak but inference is plausible.
+Only return valid JSON — no markdown fences, no commentary.`;
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 interface LLMExtractorConfig {
@@ -52,6 +93,7 @@ interface LLMExtractorConfig {
   systemPrompt?: string;
   timeoutMs?: number;
   permissiveMode?: boolean;
+  mode?: 'standard' | 'deep';
 }
 
 export class LLMExtractor {
@@ -81,7 +123,8 @@ export class LLMExtractor {
       },
       config.provider
     );
-    this.systemPrompt = config.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+    const defaultPrompt = config.mode === 'deep' ? DEEP_MODE_SYSTEM_PROMPT : DEFAULT_SYSTEM_PROMPT;
+    this.systemPrompt = config.systemPrompt ?? defaultPrompt;
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.permissiveMode = config.permissiveMode ?? true;
   }

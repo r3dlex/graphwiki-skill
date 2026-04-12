@@ -33,7 +33,8 @@ export function bfs(
       if (edge.source === id && !visited.has(edge.target)) {
         queue.push({ id: edge.target, depth: depth + 1 });
       }
-      if (edge.target === id && !visited.has(edge.source)) {
+      // In a directed graph, only follow edges in the forward direction
+      if (!graph.metadata?.directed && edge.target === id && !visited.has(edge.source)) {
         queue.push({ id: edge.source, depth: depth + 1 });
       }
     }
@@ -69,7 +70,8 @@ export function dfs(
       if (edge.source === id) {
         dfsRec(edge.target, depth + 1);
       }
-      if (edge.target === id) {
+      // In a directed graph, only follow edges in the forward direction
+      if (!graph.metadata?.directed && edge.target === id) {
         dfsRec(edge.source, depth + 1);
       }
     }
@@ -106,7 +108,8 @@ export function shortestPath(
         if (edge.target === to) return newPath;
         queue.push({ id: edge.target, path: newPath });
       }
-      if (edge.target === id && !visited.has(edge.source)) {
+      // In a directed graph, only follow edges in the forward direction
+      if (!graph.metadata?.directed && edge.target === id && !visited.has(edge.source)) {
         const newPath = [...path, edge.source];
         if (edge.source === to) return newPath;
         queue.push({ id: edge.source, path: newPath });

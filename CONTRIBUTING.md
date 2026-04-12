@@ -24,32 +24,21 @@ cd graphwiki-skill
 pnpm install
 ```
 
-### 3. Build
+### 3. Build and Test
 
 ```bash
-pnpm run build
+pnpm run build      # Build the project
+pnpm test           # Run all tests
+pnpm run lint       # Lint code
 ```
 
-### 4. Run Tests
+### 4. Verify Quality
 
 ```bash
-# All tests
-pnpm test
-
-# Watch mode
-pnpm run test:watch
-
-# Unit tests with coverage
-pnpm run test:unit
-
-# Type check
-pnpm run typecheck
-
-# Lint
-pnpm run lint
-
-# Format
-pnpm run fmt
+pnpm run typecheck  # Type check
+pnpm run test:unit  # Unit tests with coverage
+pnpm run test:watch # Watch mode for development
+pnpm run fmt        # Format code
 ```
 
 ### 5. Make Changes
