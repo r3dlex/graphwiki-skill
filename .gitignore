@@ -1,4 +1,5 @@
 .omc/
+.claude/
 node_modules/
 dist/
 *.tsbuildinfo
