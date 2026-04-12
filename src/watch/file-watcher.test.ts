@@ -167,7 +167,7 @@ describe('FileWatcher', () => {
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ removed: ['src/old-file.ts'] }),
     );
-    const call = onUpdate.mock.calls[0][0];
+    const call = onUpdate.mock.calls[0]![0];
     expect(call.added).toHaveLength(0);
     expect(call.modified).toHaveLength(0);
   });
