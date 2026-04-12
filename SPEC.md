@@ -13,6 +13,7 @@ skill-generator.ts
        +---> SKILL-claude.md
        +---> SKILL-codex.md
        +---> SKILL-copilot.md
+       +---> SKILL-auggie.md
        +---> SKILL-gemini.md
        +---> SKILL-cursor.md
        +---> SKILL-openclaw.md
@@ -25,6 +26,7 @@ skill-generator.ts
 | `SKILL-claude.md` | Claude Code native skill | YAML frontmatter + markdown |
 | `SKILL-codex.md` | Codex skill | Abbreviated markdown |
 | `SKILL-copilot.md` | GitHub Copilot | Markdown |
+| `SKILL-auggie.md` | Auggie | YAML frontmatter + markdown |
 | `SKILL-gemini.md` | Gemini | Plain text sections |
 | `SKILL-cursor.md` | Cursor IDE | JSON |
 | `SKILL-openclaw.md` | OpenClaw | YAML |
@@ -93,17 +95,7 @@ Hooks write JSON responses:
 | Cursor | Supported | JSON format |
 | OpenClaw | Supported | YAML format |
 | GitHub Copilot | Supported | Markdown, manual install |
-| Auggie | **Excluded** | Hook API undocumented, requires research |
-
-## Auggie Exclusion Rationale
-
-Auggie's hook API is undocumented. Without official documentation, we cannot verify:
-- Event format (snake_case vs camelCase vs other)
-- Hook registration mechanism
-- stdin/stdout contract
-- Timeout behavior
-
-Research is needed before v2 inclusion. Track in separate research issue.
+| Auggie | Supported | Via ~/.augment/settings.json hooks |
 
 ## Skill Installer Integration
 

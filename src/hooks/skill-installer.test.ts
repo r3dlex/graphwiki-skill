@@ -219,6 +219,56 @@ describe('skill-installer', () => {
 
       await expect(uninstallHook()).resolves.not.toThrow();
     });
+
+    it('should actually remove graphwiki hooks from the written hooks.json', async () => {
+      const { uninstallHook } = await import('./skill-installer.js');
+      const existingHooks = {
+        hooks: {
+          pre_tool_use: [
+            {
+              matcher: 'read',
+              hooks: [
+                { type: 'command', command: 'graphwiki-pretool' },
+                { type: 'command', command: 'other-hook' },
+              ],
+            },
+          ],
+          session_start: [
+            {
+              matcher: '*',
+              hooks: [
+                { type: 'command', command: 'graphwiki-session-start' },
+              ],
+            },
+          ],
+        },
+      };
+      vi.mocked(vi.mocked(await import('fs/promises')).readFile).mockResolvedValue(JSON.stringify(existingHooks));
+      Object.defineProperty(process, 'env', {
+        value: { HOME: '/home/user' },
+        writable: true,
+      });
+
+      await uninstallHook();
+
+      const writtenContent = vi.mocked(vi.mocked(await import('fs/promises')).writeFile).mock.calls[0]![1] as string;
+      const parsed = JSON.parse(writtenContent);
+
+      // graphwiki-pretool should be removed, other-hook should remain
+      const preToolHooks = parsed.hooks.pre_tool_use as Array<{ matcher: string; hooks: Array<{ command: string }> }>;
+      const readMatcher = preToolHooks.find((m) => m.matcher === 'read');
+      expect(readMatcher).toBeDefined();
+      expect(readMatcher!.hooks.some((h) => h.command.includes('graphwiki-pretool'))).toBe(false);
+      expect(readMatcher!.hooks.some((h) => h.command === 'other-hook')).toBe(true);
+
+      // session_start matcher with only graphwiki hook should be removed entirely
+      const sessionStartMatchers = parsed.hooks.session_start as Array<{ matcher: string; hooks: unknown[] }>;
+      expect(sessionStartMatchers.every((m) => m.hooks.length > 0)).toBe(true);
+      const hasGraphwikiSession = sessionStartMatchers.some((m) =>
+        (m.hooks as Array<{ command: string }>).some((h) => h.command.includes('graphwiki-session-start'))
+      );
+      expect(hasGraphwikiSession).toBe(false);
+    });
   });
 
   describe('installSkill', () => {

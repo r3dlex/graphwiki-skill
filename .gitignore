@@ -9,3 +9,4 @@ graphwiki-out/
 .wiki/
 .cache/
 *.graph.json
+SKILL-*.md

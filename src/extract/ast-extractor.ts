@@ -9,46 +9,112 @@ import type { GraphNode, GraphEdge, NodeType, EdgeRelation } from "../types.js";
 type LanguageLoader = () => Promise<{ Language: { new (): unknown } }>;
 
 const LANGUAGE_LOADERS: Record<string, LanguageLoader> = {
-  typescript: () => import("tree-sitter-typescript"),
-  javascript: () => import("tree-sitter-javascript"),
-  python: () => import("tree-sitter-python"),
-  go: () => import("tree-sitter-go"),
-  rust: () => import("tree-sitter-rust"),
-  java: () => import("tree-sitter-java"),
-  kotlin: () => import("tree-sitter-kotlin"),
-  scala: () => import("tree-sitter-scala"),
-  c: () => import("tree-sitter-c"),
-  cpp: () => import("tree-sitter-cpp"),
-  "c-sharp": () => import("tree-sitter-c-sharp"),
-  ruby: () => import("tree-sitter-ruby"),
-  php: () => import("tree-sitter-php"),
-  swift: () => import("tree-sitter-swift"),
-  lua: () => import("tree-sitter-lua"),
-  elixir: () => import("tree-sitter-elixir"),
-  bash: () => import("tree-sitter-bash"),
+  typescript: async () => {
+    try { return await import("tree-sitter-typescript"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-typescript not available, skipping"); return null as never; }
+  },
+  javascript: async () => {
+    try { return await import("tree-sitter-javascript"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-javascript not available, skipping"); return null as never; }
+  },
+  python: async () => {
+    try { return await import("tree-sitter-python"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-python not available, skipping"); return null as never; }
+  },
+  go: async () => {
+    try { return await import("tree-sitter-go"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-go not available, skipping"); return null as never; }
+  },
+  rust: async () => {
+    try { return await import("tree-sitter-rust"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-rust not available, skipping"); return null as never; }
+  },
+  java: async () => {
+    try { return await import("tree-sitter-java"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-java not available, skipping"); return null as never; }
+  },
+  kotlin: async () => {
+    try { return await import("tree-sitter-kotlin"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-kotlin not available, skipping"); return null as never; }
+  },
+  scala: async () => {
+    try { return await import("tree-sitter-scala"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-scala not available, skipping"); return null as never; }
+  },
+  c: async () => {
+    try { return await import("tree-sitter-c"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-c not available, skipping"); return null as never; }
+  },
+  cpp: async () => {
+    try { return await import("tree-sitter-cpp"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-cpp not available, skipping"); return null as never; }
+  },
+  "c-sharp": async () => {
+    try { return await import("tree-sitter-c-sharp"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-c-sharp not available, skipping"); return null as never; }
+  },
+  ruby: async () => {
+    try { return await import("tree-sitter-ruby"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-ruby not available, skipping"); return null as never; }
+  },
+  php: async () => {
+    try { return await import("tree-sitter-php"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-php not available, skipping"); return null as never; }
+  },
+  swift: async () => {
+    try { return await import("tree-sitter-swift"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-swift not available, skipping"); return null as never; }
+  },
+  lua: async () => {
+    try { return await import("tree-sitter-lua"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-lua not available, skipping"); return null as never; }
+  },
+  elixir: async () => {
+    try { return await import("tree-sitter-elixir"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-elixir not available, skipping"); return null as never; }
+  },
+  bash: async () => {
+    try { return await import("tree-sitter-bash"); }
+    catch { console.warn("[graphwiki] Grammar tree-sitter-bash not available, skipping"); return null as never; }
+  },
   // Optional grammars — installed as optionalDependencies; gracefully skipped if absent.
   // These packages use non-standard export shapes so we normalise them inline.
   // tree-sitter-zig: exports the grammar directly (no Language wrapper)
   zig: async () => {
-    const m = await import("tree-sitter-zig");
-    const lang = (m as unknown as Record<string, unknown>)["default"] ?? m;
-    return { Language: lang } as { Language: { new(): unknown } };
+    try {
+      const m = await import("tree-sitter-zig");
+      const lang = (m as unknown as Record<string, unknown>)["default"] ?? m;
+      return { Language: lang } as { Language: { new(): unknown } };
+    } catch {
+      console.warn("[graphwiki] Grammar tree-sitter-zig not available, skipping");
+      return null as never;
+    }
   },
   // tree-sitter-ocaml: exports { ocaml, ocaml_interface, ocaml_type }
   ocaml: async () => {
-    const m = await import("tree-sitter-ocaml");
-    const lang = (m as unknown as Record<string, unknown>)["ocaml"]
-      ?? (m as unknown as Record<string, unknown>)["default"]
-      ?? m;
-    return { Language: lang } as { Language: { new(): unknown } };
+    try {
+      const m = await import("tree-sitter-ocaml");
+      const lang = (m as unknown as Record<string, unknown>)["ocaml"]
+        ?? (m as unknown as Record<string, unknown>)["default"]
+        ?? m;
+      return { Language: lang } as { Language: { new(): unknown } };
+    } catch {
+      console.warn("[graphwiki] Grammar tree-sitter-ocaml not available, skipping");
+      return null as never;
+    }
   },
   // tree-sitter-haskell: exports { language, name, nodeTypeInfo }
   haskell: async () => {
-    const m = await import("tree-sitter-haskell");
-    const lang = (m as unknown as Record<string, unknown>)["language"]
-      ?? (m as unknown as Record<string, unknown>)["default"]
-      ?? m;
-    return { Language: lang } as { Language: { new(): unknown } };
+    try {
+      const m = await import("tree-sitter-haskell");
+      const lang = (m as unknown as Record<string, unknown>)["language"]
+        ?? (m as unknown as Record<string, unknown>)["default"]
+        ?? m;
+      return { Language: lang } as { Language: { new(): unknown } };
+    } catch {
+      console.warn("[graphwiki] Grammar tree-sitter-haskell not available, skipping");
+      return null as never;
+    }
   },
 };
 
@@ -109,6 +175,9 @@ export class TreeSitterFactory {
     }
 
     const mod = await langLoader();
+    if (!mod) {
+      throw new Error(`Grammar for language "${language}" is not installed`);
+    }
     const LanguageClass = (mod as { Language: { new (): unknown } }).Language;
 
     // @ts-ignore — tree-sitter Language instance
@@ -144,6 +213,7 @@ async function _getLanguage(language: string): Promise<unknown> {
   if (!loader) throw new Error(`Unsupported language: ${language}`);
 
   const mod = await loader();
+  if (!mod) throw new Error(`Grammar for language "${language}" is not installed`);
   parserCache.set(language, mod);
   return mod;
 }

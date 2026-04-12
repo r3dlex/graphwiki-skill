@@ -1,10 +1,10 @@
 // Multi-platform skill installer for GraphWiki v2
-// Supports: claude, codex, auggie, gemini, cursor, openclaw, opencode, aider, droid, trae, trae-cn
+// Supports: claude, codex, auggie, gemini, cursor, openclaw, opencode, aider, droid, trae, trae-cn, copilot
 
-import { writeFile, mkdir, readFile, access } from 'fs/promises';
+import { writeFile, mkdir, readFile, access, stat } from 'fs/promises';
 import { join, dirname } from 'path';
 
-export type Platform = 'claude' | 'codex' | 'auggie' | 'gemini' | 'cursor' | 'openclaw' | 'opencode' | 'aider' | 'droid' | 'trae' | 'trae-cn';
+export type Platform = 'claude' | 'codex' | 'auggie' | 'gemini' | 'cursor' | 'openclaw' | 'opencode' | 'aider' | 'droid' | 'trae' | 'trae-cn' | 'copilot';
 
 /**
  * Skill definition
@@ -171,6 +171,21 @@ Add to your OpenClaw configuration for automatic context.`,
 
 **Hook Integration:**
 GraphWiki hooks into Auggie via ~/.augment/settings.json for automatic context loading before each tool use.`,
+    tools: [],
+  },
+
+  copilot: {
+    name: 'graphwiki',
+    description: 'GraphWiki integration for GitHub Copilot',
+    prompt: `GraphWiki Knowledge Graph Integration
+
+**Purpose:** Navigate and query the GraphWiki knowledge base
+
+**Commands:**
+- graphwiki build . --update    # Incremental rebuild
+- graphwiki query "question"   # Ask questions
+- graphwiki status             # Show stats
+- graphwiki path <nodeA> <nodeB>  # Find path between nodes`,
     tools: [],
   },
 };
@@ -349,6 +364,46 @@ async function installAuggieHooks(): Promise<void> {
 }
 
 /**
+ * Detect all installed AI platforms
+ */
+export async function detectPlatforms(): Promise<Platform[]> {
+  const home = process.env.HOME ?? '';
+  const detected: Platform[] = [];
+
+  const fileExists = async (p: string): Promise<boolean> => {
+    try { await access(p); return true; } catch { return false; }
+  };
+  const dirExists = async (p: string): Promise<boolean> => {
+    try { const s = await stat(p); return s.isDirectory(); } catch { return false; }
+  };
+
+  if (await fileExists(join(home, '.claude', 'settings.json'))) detected.push('claude');
+  if (await fileExists(join(home, '.cursor', 'settings.json'))) detected.push('cursor');
+  if (await dirExists(join(home, '.augment'))) detected.push('auggie');
+  if (await dirExists(join(home, '.codex'))) detected.push('codex');
+  if (await dirExists(join(home, '.gemini'))) detected.push('gemini');
+  if (await dirExists(join(home, '.openclaw'))) detected.push('openclaw');
+  if (await dirExists(join(home, '.opencode'))) detected.push('opencode');
+  if (await dirExists(join(home, '.copilot'))) detected.push('copilot' as Platform);
+  if (await dirExists(join(home, '.droid'))) detected.push('droid');
+  if (await dirExists(join(home, '.trae'))) detected.push('trae');
+
+  // Aider: check for .aider.conf.yml or .aider* files in cwd
+  try {
+    await access(join(process.cwd(), '.aider.conf.yml'));
+    detected.push('aider');
+  } catch {
+    // Also check for any .aider* file via stat
+    try {
+      await access(join(process.cwd(), '.aider'));
+      detected.push('aider');
+    } catch {}
+  }
+
+  return detected;
+}
+
+/**
  * Detect current platform
  */
 export async function detectPlatform(): Promise<Platform> {
@@ -453,6 +508,12 @@ export async function installSkill(
     'trae-cn': async () => {
       const base = installPath ?? join(process.cwd(), '.trae');
       await installAgentsMdSkill('trae-cn', base);
+      return join(base, 'AGENTS.md');
+    },
+
+    copilot: async () => {
+      const base = installPath ?? join(process.env.HOME ?? '.', '.copilot');
+      await installAgentsMdSkill('copilot', base);
       return join(base, 'AGENTS.md');
     },
   };
@@ -573,12 +634,15 @@ export async function uninstallHook(): Promise<void> {
     ];
 
     for (const event of Object.keys(existing.hooks)) {
-      existing.hooks[event]?.map(matcher => ({
+      const cleaned = existing.hooks[event as keyof typeof existing.hooks]?.map(matcher => ({
         ...matcher,
         hooks: matcher.hooks.filter(h =>
           !graphwikiCommands.some(cmd => h.command?.includes(cmd))
         ),
       })).filter(matcher => matcher.hooks.length > 0);
+      if (cleaned !== undefined) {
+        existing.hooks[event as keyof typeof existing.hooks] = cleaned;
+      }
     }
 
     await writeFile(HOOKS_JSON_PATH, JSON.stringify(existing, null, 2), 'utf-8');
