@@ -113,10 +113,11 @@ function findNode(graph: GraphDocument, nodeId: string) {
 }
 
 function getNeighbors(graph: GraphDocument, nodeId: string): string[] {
+  const directed = graph.metadata?.directed === true;
   const neighborIds = new Set<string>();
   for (const edge of graph.edges) {
     if (edge.source === nodeId) neighborIds.add(edge.target);
-    if (edge.target === nodeId) neighborIds.add(edge.source);
+    if (!directed && edge.target === nodeId) neighborIds.add(edge.source);
   }
   return [...neighborIds];
 }
@@ -296,8 +297,26 @@ program
         const provider = null as unknown as import('./types.js').LLMProvider; // no LLM needed for recompile
         const compiler = new WikiCompiler(provider, { mode: options.mode ?? 'standard' });
         const updater = new WikiUpdater(config.paths.wiki, compiler);
+        const pages = await compiler.compileAll(
+          [...new Set(finalGraph.nodes.filter(n => n.community !== undefined).map(n => n.community as number))].map(id => ({
+            id,
+            node_count: finalGraph.nodes.filter(n => n.community === id).length,
+            label: `community-${id}`,
+          })),
+          finalGraph,
+        );
         await updater.recompile(finalGraph);
         console.log('[GraphWiki] Wiki recompile complete.');
+
+        // Generate Obsidian canvas from compiled pages
+        try {
+          const canvasJson = compiler.generateCanvas(pages);
+          const canvasPath = join(config.paths.wiki, 'graph.canvas');
+          await writeFile(canvasPath, canvasJson, 'utf-8');
+          console.log(`[GraphWiki] Canvas generated: ${canvasPath}`);
+        } catch {
+          // Canvas generation is non-fatal
+        }
       }
 
       // --graph-only: skip wiki compilation (already done above conditionally, just log)
@@ -449,7 +468,8 @@ program
   .description('Explain a node using BFS depth-2 traversal and community context')
   .argument('<node>', 'Node label or ID to explain')
   .action(async (nodeQuery: string) => {
-    const graph = await loadGraph();
+    const config = await loadConfig();
+    const graph = await loadGraph(config.paths.graph);
     const { bfs } = await import('./graph/traversal.js');
 
     const target = graph.nodes.find(
@@ -503,7 +523,8 @@ program
   .action(async (question: string, options) => {
     console.log(`[GraphWiki] Query: ${question}`);
 
-    const graph = await loadGraph();
+    const config = await loadConfig();
+    const graph = await loadGraph(config.paths.graph);
 
     console.log(`[GraphWiki] Searching through ${graph.nodes.length} nodes...`);
 
@@ -558,7 +579,8 @@ program
     console.log(`[GraphWiki] Asking: ${question}`);
     console.log(`[GraphWiki] Max tier: ${options.maxTier}`);
 
-    const graph = await loadGraph();
+    const config = await loadConfig();
+    const graph = await loadGraph(config.paths.graph);
 
     console.log(`[GraphWiki] Loading graph context (tier 1)...`);
     console.log(`[GraphWiki] Searching relevant nodes...`);
@@ -579,7 +601,8 @@ program
     console.log(`[GraphWiki] Ingesting: ${source}`);
 
     try {
-      const graph = await loadGraph();
+      const config = await loadConfig();
+      const graph = await loadGraph(config.paths.graph);
       let nodeLabel = source.split('/').pop() || source;
       let nodeType = 'source';
       let provenance = [source];
@@ -641,7 +664,7 @@ program
         graph.nodes.push(node);
       }
 
-      await saveGraph(graph);
+      await saveGraph(graph, config.paths.graph);
       console.log(`[GraphWiki] Ingested: ${nodeLabel}`);
       console.log(`[GraphWiki] Graph now has ${graph.nodes.length} nodes`);
     } catch (err) {
@@ -659,7 +682,8 @@ program
   .action(async (options) => {
     console.log('[GraphWiki] Running lint check...');
 
-    const graph = await loadGraph();
+    const config = await loadConfig();
+    const graph = await loadGraph(config.paths.graph);
 
     let issues = 0;
 
@@ -759,7 +783,8 @@ program
   .command('status')
   .description('Show graph statistics and health status')
   .action(async () => {
-    const graph = await loadGraph();
+    const config = await loadConfig();
+    const graph = await loadGraph(config.paths.graph);
 
     console.log('=== GraphWiki Status ===');
     console.log(`Nodes: ${graph.nodes.length}`);
@@ -807,7 +832,8 @@ program
   .argument('<nodeA>', 'Start node ID or label')
   .argument('<nodeB>', 'End node ID or label')
   .action(async (nodeA: string, nodeB: string) => {
-    const graph = await loadGraph();
+    const config = await loadConfig();
+    const graph = await loadGraph(config.paths.graph);
 
     // Find nodes
     const nodeAObj = findNode(graph, nodeA);
@@ -1036,7 +1062,8 @@ program
       const deltaContent = readFileSync(deltaPath, 'utf-8');
       const delta = JSON.parse(deltaContent);
 
-      const currentGraph = await loadGraph();
+      const config = await loadConfig();
+      const currentGraph = await loadGraph(config.paths.graph);
 
       const restoredGraph = {
         ...currentGraph,
@@ -1240,15 +1267,17 @@ const platformCmd = (name: string, description: string, hasUninstall = true) => 
   });
   if (hasUninstall) {
     cmd.command('uninstall').description(`Uninstall GraphWiki skill for ${name}`).action(async () => {
+      const { uninstallSkill } = await import('./hooks/skill-installer.js');
+      await uninstallSkill(name as Parameters<typeof uninstallSkill>[0]);
       console.log(`[GraphWiki] ${name} skill uninstalled`);
     });
   }
   return cmd;
 };
 
-platformCmd('opencode', 'OpenCode platform skill commands', false);
+platformCmd('opencode', 'OpenCode platform skill commands', true);
 platformCmd('aider', 'Aider platform skill commands');
-platformCmd('droid', 'Factory Droid platform skill commands', false);
+platformCmd('droid', 'Factory Droid platform skill commands', true);
 platformCmd('trae', 'Trae platform skill commands');
 platformCmd('trae-cn', 'Trae CN platform skill commands');
 
@@ -1261,7 +1290,8 @@ program
   .action(async (format: string, options) => {
     console.log(`[GraphWiki] Exporting to ${format}...`);
 
-    const graph = await loadGraph();
+    const config = await loadConfig();
+    const graph = await loadGraph(config.paths.graph);
     console.log(`[GraphWiki] Graph has ${graph.nodes.length} nodes, ${graph.edges.length} edges`);
 
     const outputDir = options.output;
@@ -1335,7 +1365,8 @@ program
     }
 
     console.log('[GraphWiki] Loading graph...');
-    const graph = await loadGraph();
+    const config = await loadConfig();
+    const graph = await loadGraph(config.paths.graph);
     console.log(`[GraphWiki] Graph has ${graph.nodes.length} nodes, ${graph.edges.length} edges`);
 
     console.log('[GraphWiki] Connecting to Neo4j...');
@@ -1378,7 +1409,8 @@ program
       }
 
       // Ingest into graph
-      const graph = await loadGraph();
+      const config = await loadConfig();
+      const graph = await loadGraph(config.paths.graph);
       const nodeId = `${result.kind}:${url}`;
       const nodeLabel = result.title ?? url.split('/').pop() ?? url;
       const node = {
@@ -1403,7 +1435,7 @@ program
         graph.nodes.push(node);
       }
 
-      await saveGraph(graph);
+      await saveGraph(graph, config.paths.graph);
       console.log(`[GraphWiki] Ingested: ${nodeLabel}`);
       console.log(`[GraphWiki] Graph now has ${graph.nodes.length} nodes`);
     } catch (err) {
