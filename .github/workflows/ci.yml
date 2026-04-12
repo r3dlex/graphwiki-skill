@@ -286,6 +286,13 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Configure Node.js for GitHub Packages
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+
       - name: Publish to GitHub Packages (Option A — zero secrets)
         if: steps.guard.outputs.skip != 'true'
         run: |
@@ -293,7 +300,7 @@ jobs:
           PUBLISH_VERSION="${{ steps.version.outputs.publish_version }}"
           TAG="${{ steps.mutate.outputs.tag }}"
 
-          # Scope the package for GitHub Packages (@r3dlex/graphwiki)
+          # Scope the package name for GitHub Packages (@r3dlex/graphwiki)
           node -e "
             const fs = require('fs');
             const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -301,8 +308,6 @@ jobs:
             p.publishConfig = { registry: 'https://npm.pkg.github.com', access: 'public' };
             fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
           "
-          # setup-node writes its npmrc to NPM_CONFIG_USERCONFIG, not ~/.npmrc
-          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
 
           pnpm publish --no-git-checks --tag "$TAG" || {
             EC=$?
