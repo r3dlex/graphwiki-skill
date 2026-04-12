@@ -145,32 +145,123 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     needs: [archgate, test, hook-deployment]
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9.0.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: pnpm
           registry-url: 'https://registry.npmjs.org'
+
       - run: pnpm install --frozen-lockfile
+
+      - name: Changelog gate
+        id: changelog
+        run: |
+          set -e
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          ESCAPED_VERSION=$(echo "$BASE_VERSION" | sed 's/\./\\./g')
+
+          if [ ! -f CHANGELOG.md ]; then
+            echo "::error::CHANGELOG.md not found. Add a ## [${BASE_VERSION}] section."
+            exit 1
+          fi
+
+          if ! grep -qE "^## \[?${ESCAPED_VERSION}\]?" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section for version ${BASE_VERSION}."
+            exit 1
+          fi
+
+          # Flag-based awk: skip the section header, capture content until next ## header
+          SECTION=$(awk '/^## \[?'"${ESCAPED_VERSION}"'\]?/{found=1; next} /^## /{found=0} found' CHANGELOG.md)
+          NON_ALPHA=$(echo "$SECTION" | grep -v "^$" | grep -vE "^- alpha\.[0-9a-f]+:" | head -1 || true)
+
+          if [ -n "$NON_ALPHA" ]; then
+            echo "has_stable_entry=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_stable_entry=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No stable changelog content for ${BASE_VERSION} — publishing as alpha"
+          fi
+
+      - name: Compute publish version
+        id: version
+        run: |
+          set -e
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          STABLE="${{ steps.changelog.outputs.has_stable_entry }}"
+
+          if [ "$STABLE" = "true" ]; then
+            PUBLISH_VERSION="$BASE_VERSION"
+          else
+            PUBLISH_VERSION="${BASE_VERSION}-alpha.${SHORT_SHA}"
+            COMMIT_MSG=$(git log -1 --pretty=%s)
+            RELEASE_DATE=$(date +%Y-%m-%d)
+
+            # Prefix env vars (not trailing args) + function replacer prevents $ injection
+            BASE_VERSION="$BASE_VERSION" SHORT_SHA="$SHORT_SHA" COMMIT_MSG="$COMMIT_MSG" RELEASE_DATE="$RELEASE_DATE" \
+            node -e "
+              const fs = require('fs');
+              const content = fs.readFileSync('CHANGELOG.md', 'utf8');
+              const ver = process.env.BASE_VERSION.replace(/\./g, '\\\\.');
+              const regex = new RegExp('(^## \\\\[?' + ver + '\\\\]?[^\\\\n]*)', 'm');
+              const entry = '- alpha.' + process.env.SHORT_SHA + ': ' + process.env.COMMIT_MSG + ' (' + process.env.RELEASE_DATE + ')';
+              const updated = content.replace(regex, function(match) { return match + '\n' + entry; });
+              fs.writeFileSync('CHANGELOG.md', updated);
+            "
+          fi
+
+          echo "publish_version=$PUBLISH_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing as: $PUBLISH_VERSION"
+
       - name: Version guard
         id: guard
         run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          PUBLISHED=$(npm view graphwiki version 2>/dev/null || echo "0.0.0")
-          if [ "$CURRENT" = "$PUBLISHED" ] && [ "${{ github.event.inputs.force }}" != "true" ]; then
-            echo "Version $CURRENT already published, skipping"
+          PUBLISH_VERSION="${{ steps.version.outputs.publish_version }}"
+          PUBLISHED=$(npm view "graphwiki@${PUBLISH_VERSION}" version 2>/dev/null || echo "")
+          if [ "$PUBLISH_VERSION" = "$PUBLISHED" ] && [ "${{ github.event.inputs.force }}" != "true" ]; then
+            echo "Version ${PUBLISH_VERSION} already published, skipping"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Publishing $CURRENT (published: $PUBLISHED)"
+            echo "Publishing ${PUBLISH_VERSION}"
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
+
       - name: Publish
         if: steps.guard.outputs.skip != 'true'
-        run: pnpm publish --no-git-checks
+        run: |
+          set -e
+          PUBLISH_VERSION="${{ steps.version.outputs.publish_version }}"
+
+          # Override version in package.json at publish-time only (never committed back)
+          PUBLISH_VERSION="$PUBLISH_VERSION" node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            p.version = process.env.PUBLISH_VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+
+          if [[ "$PUBLISH_VERSION" == *"-alpha."* ]]; then TAG="alpha"; else TAG="latest"; fi
+
+          pnpm publish --no-git-checks --tag "$TAG" || {
+            EC=$?
+            # Treat already-published as idempotent success (handles registry propagation lag)
+            if npm view "graphwiki@${PUBLISH_VERSION}" version 2>/dev/null | grep -q "${PUBLISH_VERSION}"; then
+              echo "::warning::Version ${PUBLISH_VERSION} already on npm — idempotent success"
+              exit 0
+            fi
+            exit $EC
+          }
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

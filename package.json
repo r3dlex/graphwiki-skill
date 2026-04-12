@@ -17,7 +17,8 @@
     "lib",
     "SKILL.md",
     "SKILL-*.md",
-    "scripts"
+    "scripts",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public",
@@ -37,7 +38,7 @@
     "generate:skills": "tsx src/hooks/skill-generator.ts",
     "prepublishOnly": "pnpm run build && pnpm run generate:skills",
     "postinstall": "node dist/postinstall.js || true",
-    "release": "changesets publish"
+    "release:check": "node -e \"const fs=require('fs');const cl=fs.readFileSync('CHANGELOG.md','utf8');const v=require('./package.json').version;if(!cl.includes('## ['+v+']'))throw new Error('CHANGELOG missing section for '+v);\""
   },
   "keywords": [
     "knowledge-graph",
