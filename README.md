@@ -83,15 +83,23 @@ When the PreToolUse hook provides insufficient context, follow this manual proto
 | `graphwiki build .` | Full graph + wiki build |
 | `graphwiki build . --update` | Incremental rebuild |
 | `graphwiki build . --resume` | Resume interrupted build |
+| `graphwiki build . --watch` | Watch mode with auto-rebuild |
+| `graphwiki build . --directed` | Build directed graphs |
+| `graphwiki build . --mode deep` | Deep mode extraction |
 | `graphwiki query "question"` | Ask the knowledge base |
 | `graphwiki path <nodeA> <nodeB>` | Find shortest path between graph nodes |
 | `graphwiki ingest <file>` | Ingest new source |
+| `graphwiki add <url>` | Add a URL source to the graph |
 | `graphwiki lint` | Health check |
 | `graphwiki status` | Stats and drift score |
 | `graphwiki benchmark "question"` | Measure token usage |
 | `graphwiki refine` | Auto-improve extraction prompts |
 | `graphwiki refine --review` | Show suggestions without applying |
 | `graphwiki refine --rollback` | Revert to previous prompts |
+| `graphwiki hook install` | Install hooks for Claude Code integration |
+| `graphwiki hook uninstall` | Uninstall hooks |
+| `graphwiki hook status` | Check hook installation status |
+| `graphwiki skill uninstall --all` | Remove all skill installations |
 
 ---
 
@@ -209,22 +217,46 @@ All ignore patterns are additive:
 
 ## Platform Installation
 
-Install GraphWiki for your platform:
+Install GraphWiki for your platform (11 supported):
 
 | Platform | Command |
 |----------|---------|
-| Claude Code | `graphwiki skill install --platform claude` |
+| Claude | `graphwiki skill install --platform claude` |
 | Codex | `graphwiki skill install --platform codex` |
-| Auggie | `graphwiki skill install --platform auggie` |
 | Gemini | `graphwiki skill install --platform gemini` |
 | Cursor | `graphwiki skill install --platform cursor` |
 | OpenClaw | `graphwiki skill install --platform openclaw` |
-| WindSurf | Manual: copy `SKILL-windsurf.md` to WindSurf config |
-| Cody | Manual: copy `SKILL-cody.md` to Cody config |
-| CodeWhisperer | Manual: copy `SKILL-codewhisperer.md` to CodeWhisperer config |
+| OpenCode | `graphwiki skill install --platform opencode` |
+| Aider | `graphwiki skill install --platform aider` |
+| Droid | `graphwiki skill install --platform droid` |
+| Trae | `graphwiki skill install --platform trae` |
+| Trae-CN | `graphwiki skill install --platform trae-cn` |
 | GitHub Copilot | Copy `SKILL-copilot.md` to `.github/copilot/` |
+| Auggie | `graphwiki skill install --platform auggie` |
 
 For full skill documentation, see [SKILL.md](SKILL.md).
+
+---
+
+## Configurable Paths
+
+GraphWiki uses `.graphwiki/config.json` to specify paths:
+
+```json
+{
+  "paths": {
+    "raw": "raw/",
+    "graphwiki_out": "graphwiki-out/",
+    "wiki": "wiki/",
+    "ignore_patterns": [".omc/", ".oma/", "node_modules/", "dist/"]
+  }
+}
+```
+
+- **raw** — source directory (immutable)
+- **graphwiki_out** — graph output directory (auto-generated)
+- **wiki** — compiled wiki pages (auto-generated)
+- **ignore_patterns** — glob patterns to exclude from build
 
 ---
 

@@ -6,7 +6,7 @@
 import { Command } from 'commander';
 import { readFile, writeFile } from 'fs/promises';
 import { glob } from 'glob';
-import { resolveIgnores } from './util/ignore-resolver.js';
+import { resolveIgnoresSplit } from './util/ignore-resolver.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, mkdirSync } from 'fs';
@@ -25,6 +25,45 @@ const packageJson = JSON.parse(
   await readFile(join(__dirname, '../package.json'), 'utf-8')
 );
 const VERSION = packageJson.version;
+
+// ============================================================
+// Config
+// ============================================================
+
+interface GraphWikiPaths {
+  graph: string;
+  wiki: string;
+  deltas: string;
+  report: string;
+  svg: string;
+  driftLog: string;
+}
+
+interface GraphWikiConfig {
+  paths: GraphWikiPaths;
+}
+
+const DEFAULT_PATHS: GraphWikiPaths = {
+  graph: '.graphwiki/graph.json',
+  wiki: '.graphwiki/wiki',
+  deltas: 'graphwiki-out/deltas',
+  report: 'graphwiki-out/GRAPH_REPORT.md',
+  svg: 'graphwiki-out/graph.svg',
+  driftLog: 'graphwiki-out/drift.log',
+};
+
+async function loadConfig(): Promise<GraphWikiConfig> {
+  const configPath = '.graphwiki/config.json';
+  try {
+    const content = await readFile(configPath, 'utf-8');
+    const raw = JSON.parse(content) as Partial<{ paths: Partial<GraphWikiPaths> }>;
+    return {
+      paths: { ...DEFAULT_PATHS, ...(raw.paths ?? {}) },
+    };
+  } catch {
+    return { paths: { ...DEFAULT_PATHS } };
+  }
+}
 
 // ============================================================
 // Types
@@ -141,6 +180,7 @@ program
   .option('--watch', 'Watch for file changes and rebuild incrementally')
   .action(async (path: string, options) => {
     const startTime = Date.now();
+    const config = await loadConfig();
     console.log(`[GraphWiki] Building graph from ${path}`);
     console.log(`[GraphWiki] Options:`, options);
 
@@ -175,14 +215,14 @@ program
 
     try {
       // Load existing graph
-      const oldGraph = await loadGraph();
+      const oldGraph = await loadGraph(config.paths.graph);
 
       // Count source files
       let fileCount = 0;
-      const [ignorePatterns, _sources] = await resolveIgnores(path);
+      const { extractionIgnores, outputIgnores } = await resolveIgnoresSplit(path);
       const discovered = await glob("**/*", {
         cwd: path,
-        ignore: ignorePatterns,
+        ignore: extractionIgnores,
         absolute: false,
       });
       fileCount = discovered.length;
@@ -233,7 +273,7 @@ program
         const _driftDetector = new DriftDetector({
           drift_threshold: 0.1,
           max_scoped_runs: 100,
-          logPath: 'graphwiki-out/drift.log',
+          logPath: config.paths.driftLog,
         });
 
         // Placeholder: in Phase A this would call the real extraction pipeline
@@ -241,7 +281,7 @@ program
         const newGraph = oldGraph; // In real implementation, newGraph would come from extraction
         if (oldGraph.nodes.length > 0) {
           const delta = computeDelta(oldGraph, newGraph);
-          persistDelta(delta, 'graphwiki-out/deltas');
+          persistDelta(delta, config.paths.deltas);
           console.log(`[GraphWiki] Delta: ${delta.added.nodes.length} added, ${delta.removed.nodes.length} removed, ${delta.modified.length} modified`);
           console.log(`[GraphWiki] DriftDetector initialized (run count: ${_driftDetector.getRunCount()})`);
         }
@@ -254,7 +294,7 @@ program
         const { WikiCompiler } = await import('./wiki/compiler.js');
         const provider = null as unknown as import('./types.js').LLMProvider; // no LLM needed for recompile
         const compiler = new WikiCompiler(provider, { mode: options.mode ?? 'standard' });
-        const updater = new WikiUpdater('.graphwiki/wiki', compiler);
+        const updater = new WikiUpdater(config.paths.wiki, compiler);
         await updater.recompile(finalGraph);
         console.log('[GraphWiki] Wiki recompile complete.');
       }
@@ -286,11 +326,46 @@ program
         console.log(`[GraphWiki] Incremental result: ${_incrementalResult.addedNodes.length} added, ${_incrementalResult.removedNodes.length} removed`);
       }
 
-      // Save final state
+      // Save final state — apply outputIgnores to exclude nodes from .graphifyignore
+      // files. These files were extracted (for LLM context) but their nodes must
+      // not appear in the published graph.json output.
+      if (outputIgnores.length > 0) {
+        // Convert a glob pattern to a RegExp for simple matching
+        const globToRegex = (pattern: string): RegExp => {
+          const escaped = pattern
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*\*/g, '.*')
+            .replace(/\*/g, '[^/]*')
+            .replace(/\?/g, '[^/]');
+          return new RegExp(`(^|/)${escaped}(/|$)`);
+        };
+        const outputIgnoreRegexes = outputIgnores.map(globToRegex);
+        const isOutputIgnored = (sourceFile: string | undefined) =>
+          sourceFile !== undefined &&
+          outputIgnoreRegexes.some(re => re.test(sourceFile));
+
+        const excludedNodeIds = new Set(
+          finalGraph.nodes
+            .filter(n => isOutputIgnored(n.source_file))
+            .map(n => n.id)
+        );
+
+        if (excludedNodeIds.size > 0) {
+          finalGraph = {
+            ...finalGraph,
+            nodes: finalGraph.nodes.filter(n => !excludedNodeIds.has(n.id)),
+            edges: finalGraph.edges.filter(
+              e => !excludedNodeIds.has(e.source) && !excludedNodeIds.has(e.target)
+            ),
+          };
+          console.log(`[GraphWiki] Excluded ${excludedNodeIds.size} nodes matching .graphifyignore patterns from output`);
+        }
+      }
+
       if (options.directed) {
         finalGraph.metadata = { ...finalGraph.metadata, directed: true };
       }
-      await saveGraph(finalGraph);
+      await saveGraph(finalGraph, config.paths.graph);
 
       // D4: Atomic write — write batch state using temp+rename pattern
       const bc = new BatchCoordinator();
@@ -298,7 +373,7 @@ program
 
       // --svg: export graph to SVG after build
       if (options.svg) {
-        const svgOutputPath = typeof options.svg === 'string' ? options.svg : 'graphwiki-out/graph.svg';
+        const svgOutputPath = typeof options.svg === 'string' ? options.svg : config.paths.svg;
         console.log(`[GraphWiki] Exporting graph to SVG: ${svgOutputPath}`);
         const { exportToSvg } = await import('./export/svg.js');
         await exportToSvg(finalGraph, svgOutputPath);
@@ -325,7 +400,7 @@ program
         const { FileWatcher } = await import('./watch/file-watcher.js');
         const watcher = new FileWatcher({
           path,
-          graphPath: '.graphwiki/graph.json',
+          graphPath: config.paths.graph,
           autoDocs: !!options.autoDocs,
           onNotify: (files) => {
             console.log(`[GraphWiki] Doc/media files changed (graph may be stale): ${files.join(', ')}`);
@@ -335,7 +410,7 @@ program
             const newGraph = oldGraph; // In real impl, re-run extraction for these files
             if (oldGraph.nodes.length > 0) {
               const delta = computeDelta(oldGraph, newGraph);
-              persistDelta(delta, 'graphwiki-out/deltas');
+              persistDelta(delta, config.paths.deltas);
               console.log(`[GraphWiki] Delta: ${delta.added.nodes.length} added, ${delta.removed.nodes.length} removed`);
             }
           },
@@ -992,16 +1067,81 @@ skill
   .description('Remove GraphWiki skill installation')
   .option('--platform <p>', 'Platform to uninstall from')
   .option('--hooks', 'Also remove PreToolUse hooks', false)
+  .option('--all', 'Uninstall from all detected platforms', false)
   .action(async (options) => {
-    const platform = options.platform || 'claude';
-    console.log(`[GraphWiki] Uninstalling skill for ${platform}...`);
+    const { uninstallHook, uninstallSkill, detectPlatforms, detectPlatform } = await import('./hooks/skill-installer.js');
 
-    const { uninstallHook } = await import('./hooks/skill-installer.js');
-
-    if (options.hooks || platform === 'claude') {
+    if (options.all) {
+      const platforms = await detectPlatforms();
+      console.log(`[GraphWiki] Uninstalling from all detected platforms: ${platforms.join(', ')}`);
+      for (const p of platforms) {
+        await uninstallSkill(p);
+      }
       await uninstallHook();
+    } else {
+      const platform = options.platform || await detectPlatform();
+      console.log(`[GraphWiki] Uninstalling skill for ${platform}...`);
+      await uninstallSkill(platform);
+      if (options.hooks || platform === 'claude') {
+        await uninstallHook();
+      }
     }
     console.log(`[GraphWiki] Skill uninstalled successfully`);
+  });
+
+// Hook command (install, uninstall, status)
+const hookCmd = program.command('hook').description('Hook management commands');
+
+hookCmd
+  .command('install')
+  .description('Install GraphWiki PreToolUse hook')
+  .action(async () => {
+    const { installHook } = await import('./hooks/skill-installer.js');
+    await installHook();
+    console.log('[GraphWiki] Hook installed successfully');
+  });
+
+hookCmd
+  .command('uninstall')
+  .description('Remove GraphWiki PreToolUse hook')
+  .action(async () => {
+    const { uninstallHook } = await import('./hooks/skill-installer.js');
+    await uninstallHook();
+    console.log('[GraphWiki] Hook uninstalled successfully');
+  });
+
+hookCmd
+  .command('status')
+  .description('Check GraphWiki hook installation status')
+  .action(async () => {
+    const os = await import('os');
+    const { readFile: rf } = await import('fs/promises');
+    const { existsSync: ef } = await import('fs');
+
+    const candidates = [
+      os.default.homedir() + '/.claude/claude_desktop_config.json',
+      os.default.homedir() + '/.claude/hooks.json',
+    ];
+
+    let found = false;
+    for (const candidate of candidates) {
+      if (ef(candidate)) {
+        try {
+          const content = await rf(candidate, 'utf-8');
+          if (content.includes('graphwiki')) {
+            console.log(`[GraphWiki] Hook is INSTALLED (found in ${candidate})`);
+            found = true;
+            break;
+          }
+        } catch {
+          // ignore read errors
+        }
+      }
+    }
+
+    if (!found) {
+      console.log('[GraphWiki] Hook is NOT installed');
+    }
   });
 
 // Platform shortcut commands

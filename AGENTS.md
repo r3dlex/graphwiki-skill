@@ -25,21 +25,28 @@ Step 5: Read `raw/` files ONLY IF:
 
 ## Commands
 
-graphwiki build . --update      # Incremental rebuild after file changes
-graphwiki build . --resume      # Resume a crashed/interrupted build
-graphwiki build . --permissive  # Allow coerced extraction results
-graphwiki query "question"      # Ask the knowledge base
-graphwiki path <nodeA> <nodeB>   # Find shortest path between graph nodes
-graphwiki lint                  # Health check for contradictions
-graphwiki status               # Stats and drift score
-graphwiki ingest <file>         # Process a new source file (PDF, code, doc)
-graphwiki benchmark "question"  # Measure token usage for this query
-graphwiki refine               # Auto-improve extraction prompts
-graphwiki refine --review      # Show suggestions without applying
-graphwiki refine --rollback     # Revert to previous prompts
+graphwiki build . --update          # Incremental rebuild after file changes
+graphwiki build . --resume          # Resume a crashed/interrupted build
+graphwiki build . --permissive      # Allow coerced extraction results
+graphwiki build . --watch           # Watch mode with auto-rebuild
+graphwiki build . --directed        # Build directed graphs
+graphwiki build . --mode deep       # Deep mode extraction
+graphwiki query "question"          # Ask the knowledge base
+graphwiki path <nodeA> <nodeB>      # Find shortest path between graph nodes
+graphwiki add <url>                 # Add a URL source to the graph
+graphwiki lint                      # Health check for contradictions
+graphwiki status                    # Stats and drift score
+graphwiki ingest <file>             # Process a new source file (PDF, code, doc)
+graphwiki benchmark "question"      # Measure token usage for this query
+graphwiki refine                    # Auto-improve extraction prompts
+graphwiki refine --review           # Show suggestions without applying
+graphwiki refine --rollback         # Revert to previous prompts
+graphwiki hook install              # Install hooks for Claude Code integration
+graphwiki hook uninstall            # Uninstall hooks
+graphwiki hook status               # Check hook installation status
 graphwiki skill install [--platform <name>]  # Install skill for current platform
 graphwiki skill generate [--check]           # Generate platform-specific skill files
-graphwiki skill uninstall [--platform <name>] # Remove skill installation
+graphwiki skill uninstall --all              # Remove all skill installations
 
 ## Wiki Page Format
 

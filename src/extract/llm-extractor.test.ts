@@ -144,4 +144,36 @@ describe("LLMExtractor", () => {
     const r = await extractor.extract(Buffer.from("unique content " + randomUUID()), "python", "new.py");
     expect(r.cache_hit).toBe(false);
   });
+
+  it("deep mode uses a different (more aggressive) prompt than standard mode", async () => {
+    const capturedMessages: Array<Array<{ role: string; content: string }>> = [];
+    const capturingProvider: LLMProvider = {
+      complete: async (messages) => {
+        capturedMessages.push(messages as Array<{ role: string; content: string }>);
+        return { content: JSON.stringify(validDoc) };
+      },
+      completeMessages: async (messages) => {
+        capturedMessages.push(messages as Array<{ role: string; content: string }>);
+        return { content: JSON.stringify(validDoc) };
+      },
+      getTokenizer: () => ({
+        encode: async () => [1, 2, 3],
+        decode: async () => "decoded",
+        tokenCount: async () => 3,
+      }),
+    } as unknown as LLMProvider;
+
+    const standardExtractor = new LLMExtractor({ provider: capturingProvider, cacheDir: tmpCacheDir(), mode: 'standard' });
+    await standardExtractor.extract(Buffer.from("code standard"), "python", "standard.py");
+    const standardPrompt = capturedMessages[0]?.find(m => m.role === "system")?.content ?? "";
+
+    const deepExtractor = new LLMExtractor({ provider: capturingProvider, cacheDir: tmpCacheDir(), mode: 'deep' });
+    await deepExtractor.extract(Buffer.from("code deep"), "python", "deep.py");
+    const deepPrompt = capturedMessages[1]?.find(m => m.role === "system")?.content ?? "";
+
+    expect(deepPrompt).not.toBe(standardPrompt);
+    expect(deepPrompt.toLowerCase()).toContain("deep");
+    expect(deepPrompt.toLowerCase()).toContain("speculative");
+    expect(deepPrompt.toLowerCase()).toContain("ambiguous");
+  });
 });

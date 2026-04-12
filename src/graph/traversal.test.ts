@@ -118,6 +118,62 @@ describe("traversal", () => {
     });
   });
 
+  describe("directed graph traversal", () => {
+    const directedGraph: GraphDocument = {
+      nodes: [
+        { id: "a", label: "A", type: "class" },
+        { id: "b", label: "B", type: "class" },
+        { id: "c", label: "C", type: "class" },
+      ],
+      edges: [
+        { id: "e1", source: "a", target: "b", weight: 1 },
+        { id: "e2", source: "b", target: "c", weight: 1 },
+      ],
+      metadata: { directed: true },
+    };
+
+    it("bfs in directed graph only follows forward edges", () => {
+      // Starting from "c", in a directed graph we cannot traverse back to "b" or "a"
+      const result = bfs(directedGraph, "c");
+      const ids = result.map((n) => n.id);
+      expect(ids).toContain("c");
+      expect(ids).not.toContain("b");
+      expect(ids).not.toContain("a");
+    });
+
+    it("dfs in directed graph only follows forward edges", () => {
+      const result = dfs(directedGraph, "c");
+      const ids = result.map((n) => n.id);
+      expect(ids).toContain("c");
+      expect(ids).not.toContain("b");
+      expect(ids).not.toContain("a");
+    });
+
+    it("shortestPath in directed graph returns empty when path only exists in reverse direction", () => {
+      // c -> a has no directed path (edges go a->b->c only)
+      const path = shortestPath(directedGraph, "c", "a");
+      expect(path).toEqual([]);
+    });
+
+    it("shortestPath in directed graph finds forward path", () => {
+      const path = shortestPath(directedGraph, "a", "c");
+      expect(path).toEqual(["a", "b", "c"]);
+    });
+
+    it("bfs in undirected graph traverses reverse edges", () => {
+      const undirected: GraphDocument = {
+        nodes: directedGraph.nodes,
+        edges: directedGraph.edges,
+        metadata: { directed: false },
+      };
+      const result = bfs(undirected, "c");
+      const ids = result.map((n) => n.id);
+      expect(ids).toContain("c");
+      expect(ids).toContain("b");
+      expect(ids).toContain("a");
+    });
+  });
+
   describe("getSubgraph", () => {
     it("should extract nodes and edges for given IDs", () => {
       const result = getSubgraph(sampleGraph, ["n0", "n1", "n3"]);

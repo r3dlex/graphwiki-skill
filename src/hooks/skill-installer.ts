@@ -1,7 +1,7 @@
 // Multi-platform skill installer for GraphWiki v2
 // Supports: claude, codex, auggie, gemini, cursor, openclaw, opencode, aider, droid, trae, trae-cn, copilot
 
-import { writeFile, mkdir, readFile, access, stat } from 'fs/promises';
+import { writeFile, mkdir, readFile, access, stat, rm, unlink } from 'fs/promises';
 import { join, dirname } from 'path';
 
 export type Platform = 'claude' | 'codex' | 'auggie' | 'gemini' | 'cursor' | 'openclaw' | 'opencode' | 'aider' | 'droid' | 'trae' | 'trae-cn' | 'copilot';
@@ -659,4 +659,146 @@ export async function installAll(): Promise<void> {
   const platform = await detectPlatform();
   await installSkill(platform);
   await installHook();
+}
+
+/**
+ * Uninstall GraphWiki skill for a specific platform
+ */
+export async function uninstallSkill(platform: Platform): Promise<void> {
+  const home = process.env.HOME ?? '.';
+
+  const fileExists = async (p: string): Promise<boolean> => {
+    try { await access(p); return true; } catch { return false; }
+  };
+
+  switch (platform) {
+    case 'claude': {
+      const skillDir = join(home, '.claude', 'skills', 'graphwiki');
+      const marker = join(skillDir, '.graphwiki-managed');
+      if (!(await fileExists(marker))) {
+        console.log(`[GraphWiki] Skipping claude uninstall — no .graphwiki-managed marker found at ${skillDir}`);
+        break;
+      }
+      await rm(skillDir, { recursive: true, force: true });
+      console.log(`[GraphWiki] Removed claude skill directory: ${skillDir}`);
+      break;
+    }
+
+    case 'codex': {
+      const filePath = join(home, '.codex', 'skills', 'graphwiki.md');
+      if (await fileExists(filePath)) {
+        await unlink(filePath);
+        console.log(`[GraphWiki] Removed codex skill: ${filePath}`);
+      }
+      break;
+    }
+
+    case 'gemini': {
+      const filePath = join(home, '.gemini', 'skills', 'graphwiki-prompt.txt');
+      if (await fileExists(filePath)) {
+        await unlink(filePath);
+        console.log(`[GraphWiki] Removed gemini skill: ${filePath}`);
+      }
+      break;
+    }
+
+    case 'cursor': {
+      const filePath = join(home, '.cursor', 'extensions', 'graphwiki.json');
+      if (await fileExists(filePath)) {
+        await unlink(filePath);
+        console.log(`[GraphWiki] Removed cursor skill: ${filePath}`);
+      }
+      break;
+    }
+
+    case 'openclaw': {
+      const filePath = join(home, '.openclaw', 'skills', 'graphwiki.yaml');
+      if (await fileExists(filePath)) {
+        await unlink(filePath);
+        console.log(`[GraphWiki] Removed openclaw skill: ${filePath}`);
+      }
+      break;
+    }
+
+    case 'opencode':
+    case 'aider':
+    case 'droid':
+    case 'trae':
+    case 'trae-cn': {
+      // These write an AGENTS.md file — remove the graphwiki section if present,
+      // or remove the file entirely if it was fully managed by graphwiki.
+      const baseDirs: Record<string, string> = {
+        opencode: join(process.cwd(), '.opencode'),
+        aider: process.cwd(),
+        droid: join(process.cwd(), '.droid'),
+        trae: join(process.cwd(), '.trae'),
+        'trae-cn': join(process.cwd(), '.trae'),
+      };
+      const agentsMd = join(baseDirs[platform], 'AGENTS.md');
+      if (await fileExists(agentsMd)) {
+        const content = await readFile(agentsMd, 'utf-8');
+        // Remove section between <!-- graphwiki-start --> and <!-- graphwiki-end --> if present
+        if (content.includes('<!-- graphwiki-start -->')) {
+          const cleaned = content.replace(/<!-- graphwiki-start -->[\s\S]*?<!-- graphwiki-end -->\n?/g, '').trim();
+          await writeFile(agentsMd, cleaned + (cleaned.length ? '\n' : ''), 'utf-8');
+          console.log(`[GraphWiki] Removed graphwiki section from ${agentsMd}`);
+        } else {
+          // File was written entirely by graphwiki — remove it
+          await unlink(agentsMd);
+          console.log(`[GraphWiki] Removed ${agentsMd}`);
+        }
+      }
+      break;
+    }
+
+    case 'auggie': {
+      const skillDir = join(home, '.augment', 'skills', 'graphwiki');
+      await rm(skillDir, { recursive: true, force: true });
+      console.log(`[GraphWiki] Removed auggie skill directory: ${skillDir}`);
+
+      // Remove graphwiki entries from ~/.augment/settings.json
+      const settingsPath = join(home, '.augment', 'settings.json');
+      if (await fileExists(settingsPath)) {
+        const content = await readFile(settingsPath, 'utf-8');
+        const settings = JSON.parse(content) as Record<string, unknown>;
+        const graphwikiCommands = [
+          'graphwiki-auggie-pretool',
+          'graphwiki-auggie-session-start',
+          'graphwiki-auggie-posttool',
+        ];
+
+        const hookKeys = ['pre_tool_use', 'session_start', 'post_tool_use'] as const;
+        for (const key of hookKeys) {
+          const hooks = settings[key];
+          if (!Array.isArray(hooks)) continue;
+          settings[key] = hooks
+            .map((entry: Record<string, unknown>) => ({
+              ...entry,
+              hooks: Array.isArray(entry['hooks'])
+                ? (entry['hooks'] as Array<Record<string, unknown>>).filter(
+                    (h) => !graphwikiCommands.some(cmd => typeof h['command'] === 'string' && h['command'].includes(cmd))
+                  )
+                : entry['hooks'],
+            }))
+            .filter((entry: Record<string, unknown>) =>
+              Array.isArray(entry['hooks']) ? (entry['hooks'] as unknown[]).length > 0 : true
+            );
+        }
+
+        await writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+        console.log(`[GraphWiki] Removed graphwiki hooks from ${settingsPath}`);
+      }
+      break;
+    }
+
+    case 'copilot': {
+      const skillDir = join(home, '.copilot', 'skills', 'graphwiki');
+      await rm(skillDir, { recursive: true, force: true });
+      console.log(`[GraphWiki] Removed copilot skill directory: ${skillDir}`);
+      break;
+    }
+
+    default:
+      console.log(`[GraphWiki] No uninstall handler for platform: ${platform}`);
+  }
 }

@@ -52,14 +52,30 @@ export class WikiCompiler {
         const communityNodes = nodes.filter((n) => n.community === community.id);
         for (const node of communityNodes) {
           const stage3 = await this.compileStage3(node.id, node.label);
-          sectionContent.push(`\n### ${node.label}\n\n${stage3.deep_content}`);
+          sectionContent.push(`\n### [[${node.label}]]\n\n${stage3.deep_content}`);
         }
       }
 
       sections.push(`## ${header}\n\n${sectionContent.join('\n')}`);
     }
 
-    const content = `# ${pageName}\n\n${stage1.outline}\n\n${sections.join('\n\n')}`;
+    // Build wikilinks for related nodes in this community
+    const communityNodes = nodes.filter((n) => n.community === community.id);
+    const relatedLinks = communityNodes
+      .map((n) => `- [[${n.label}]]`)
+      .join('\n');
+    const relatedSection = communityNodes.length > 0
+      ? `\n\n## Related\n\n${relatedLinks}`
+      : '';
+
+    const content = `# ${pageName}\n\n${stage1.outline}\n\n${sections.join('\n\n')}${relatedSection}`;
+
+    // Derive tags from node types and community
+    const nodeTypes = [...new Set(communityNodes.map((n) => n.type))];
+    const tags: string[] = ['generated', 'graphwiki', ...nodeTypes];
+    if (community.id !== undefined) {
+      tags.push(`community-${community.id}`);
+    }
 
     return {
       path: `wiki/${pageName.replace(/\s+/g, '-').toLowerCase()}.md`,
@@ -67,10 +83,35 @@ export class WikiCompiler {
         community: community.id,
         label: pageName,
         type: 'community',
-        tags: ['generated', 'graphwiki'],
+        tags,
       },
       content,
     };
+  }
+
+  generateCanvas(pages: WikiPage[]): string {
+    const GRID_COLS = Math.ceil(Math.sqrt(pages.length || 1));
+    const COL_WIDTH = 300;
+    const ROW_HEIGHT = 120;
+
+    const canvasNodes = pages.map((page, i) => {
+      const col = i % GRID_COLS;
+      const row = Math.floor(i / GRID_COLS);
+      const fileName = page.path.startsWith('wiki/')
+        ? page.path.slice(5)
+        : page.path;
+      return {
+        id: page.frontmatter.label.replace(/\s+/g, '-').toLowerCase(),
+        type: 'file',
+        file: fileName,
+        x: col * COL_WIDTH,
+        y: row * ROW_HEIGHT,
+        width: 250,
+        height: 60,
+      };
+    });
+
+    return JSON.stringify({ nodes: canvasNodes, edges: [] }, null, 2);
   }
 
   async compileStage1(
