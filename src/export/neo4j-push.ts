@@ -85,3 +85,48 @@ export async function pushGraphToNeo4j(
     await driver.close();
   }
 }
+
+export async function verifyNeo4jPush(
+  graph: GraphDocument,
+  options: Neo4jPushOptions
+): Promise<void> {
+  const { uri, user, password, database = "neo4j" } = options;
+
+  const neo4j = await import("neo4j-driver");
+  const driver = neo4j.default.driver(uri, neo4j.default.auth.basic(user, password));
+  const session = driver.session({ database });
+
+  try {
+    const nodeResult = await session.run("MATCH (n) RETURN count(n) as nodeCount");
+    const edgeResult = await session.run("MATCH ()-[r]->() RETURN count(r) as edgeCount");
+
+    const neo4jNodeCount: number = nodeResult.records[0]?.get("nodeCount").toNumber() ?? 0;
+    const neo4jEdgeCount: number = edgeResult.records[0]?.get("edgeCount").toNumber() ?? 0;
+
+    const expectedNodes = graph.nodes.length;
+    const expectedEdges = graph.edges.length;
+
+    if (expectedNodes > 0) {
+      const nodeDiff = Math.abs(neo4jNodeCount - expectedNodes) / expectedNodes;
+      if (nodeDiff > 0.05) {
+        console.warn(
+          `[neo4j-verify] WARNING: node count mismatch — expected ${expectedNodes}, got ${neo4jNodeCount} (${(nodeDiff * 100).toFixed(1)}% diff)`
+        );
+      }
+    }
+
+    if (expectedEdges > 0) {
+      const edgeDiff = Math.abs(neo4jEdgeCount - expectedEdges) / expectedEdges;
+      if (edgeDiff > 0.05) {
+        console.warn(
+          `[neo4j-verify] WARNING: edge count mismatch — expected ${expectedEdges}, got ${neo4jEdgeCount} (${(edgeDiff * 100).toFixed(1)}% diff)`
+        );
+      }
+    }
+
+    console.log(`[neo4j-verify] Verified: ${neo4jNodeCount} nodes, ${neo4jEdgeCount} edges in Neo4j`);
+  } finally {
+    await session.close();
+    await driver.close();
+  }
+}

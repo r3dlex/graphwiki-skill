@@ -172,6 +172,7 @@ program
   .option('--wiki-only', 'Recompile wiki only (skip extraction, use existing graph)')
   .option('--svg [path]', 'Export graph to SVG after build')
   .option('--neo4j-push <uri>', 'Push graph to Neo4j after build (requires NEO4J_USER and NEO4J_PASSWORD env vars)')
+  .option('--neo4j-verify', 'After pushing to Neo4j, verify node/edge counts match')
   .option('--auto-docs', 'Route doc file changes to onUpdate in watch mode (default: notify only)')
   .option('--force', 'Force full rebuild (clear cache)')
   .option('--no-onnx', 'Use rough similarity fallback (skip ONNX model download)')
@@ -389,9 +390,12 @@ program
           console.error('[GraphWiki] --neo4j-push requires NEO4J_PASSWORD env var');
         } else {
           console.log(`[GraphWiki] Pushing graph to Neo4j: ${neo4jUri}`);
-          const { pushGraphToNeo4j } = await import('./export/neo4j-push.js');
+          const { pushGraphToNeo4j, verifyNeo4jPush } = await import('./export/neo4j-push.js');
           const result = await pushGraphToNeo4j(finalGraph, { uri: neo4jUri, user: neo4jUser, password: neo4jPassword });
           console.log(`[GraphWiki] Neo4j push complete: ${result.nodeCount} nodes, ${result.edgeCount} edges.`);
+          if (options.neo4jVerify) {
+            await verifyNeo4jPush(finalGraph, { uri: neo4jUri, user: neo4jUser, password: neo4jPassword });
+          }
         }
       }
 
@@ -651,6 +655,7 @@ program
   .command('lint')
   .description('Run health check on the graph')
   .option('--fix', 'Auto-fix issues where possible')
+  .option('--spec-drift', 'Check for exported functions not covered in spec files')
   .action(async (options) => {
     console.log('[GraphWiki] Running lint check...');
 
@@ -697,6 +702,54 @@ program
       console.log(`[GraphWiki] Found ${issues} issues`);
       if (options.fix) {
         console.log('[GraphWiki] Auto-fix not yet implemented');
+      }
+    }
+
+    // --spec-drift: check exported functions have spec coverage
+    if (options.specDrift) {
+      const { execSync } = await import('child_process');
+      const specFiles = existsSync('spec') ? await glob('spec/**/*.{ts,js,md}', {}) : [];
+      const specContents = specFiles.map(f => {
+        try { return readFileSync(f, 'utf-8'); } catch { return ''; }
+      }).join('\n');
+
+      const targetFiles = [
+        'src/hooks/skill-installer.ts',
+        'src/wiki/compiler.ts',
+        'src/extract/llm-extractor.ts',
+        'src/graph/traversal.ts',
+        'src/util/ignore-resolver.ts',
+      ];
+
+      let driftCount = 0;
+      for (const file of targetFiles) {
+        if (!existsSync(file)) continue;
+        let output = '';
+        try {
+          output = execSync(
+            `grep -E "^export (async )?function|^export (const|class) " "${file}"`,
+            { encoding: 'utf-8' }
+          );
+        } catch {
+          continue;
+        }
+        for (const line of output.split('\n')) {
+          const m = line.match(/export\s+(?:async\s+)?(?:function|const|class)\s+(\w+)/);
+          if (!m) continue;
+          const fnName = m[1]!;
+          if (!specContents.includes(fnName)) {
+            console.log(`[DRIFT] function '${fnName}' not found in any spec file`);
+            driftCount++;
+          }
+        }
+      }
+
+      if (driftCount > 0) {
+        if (!options.fix) {
+          process.exit(1);
+        }
+      } else {
+        console.log('[GraphWiki] No spec drift found');
       }
     }
   });
@@ -789,22 +842,55 @@ program
   .command('benchmark')
   .description('Run benchmark query and measure token usage')
   .argument('[query]', 'Benchmark query (optional)')
-  .action(async (query: string | undefined) => {
+  .option('--reset', 'Overwrite the saved baseline')
+  .action(async (query: string | undefined, options) => {
+    const graphPath = '.graphwiki/graph.json';
+    if (!existsSync(graphPath)) {
+      console.error('[GraphWiki] No graph found, build first');
+      process.exit(1);
+    }
+
+    const graph = await loadGraph(graphPath);
     const q = query || 'What functions are defined in this codebase?';
     console.log(`[GraphWiki] Benchmarking: ${q}`);
 
-    const graph = await loadGraph();
+    const { BaselineRunner } = await import('./benchmark/baseline-runner.js');
+    const runner = await BaselineRunner.withTiktoken();
+    const run = await runner.runGraphWiki(q, { files: [], size_bytes: 0, language: 'unknown' });
 
-    // Simulate token counting
-    const inputTokens = Math.ceil(q.length / 4);
-    const contextTokens = graph.nodes.length * 10;
-    const outputTokens = 50;
+    const result = {
+      timestamp: new Date().toISOString(),
+      nodeCount: graph.nodes.length,
+      edgeCount: graph.edges.length,
+      totalTokens: run.tokens_consumed,
+      method: 'graphwiki' as const,
+    };
 
     console.log('\n[Results]');
-    console.log(`  Query tokens: ${inputTokens}`);
-    console.log(`  Context tokens: ${contextTokens}`);
-    console.log(`  Output tokens: ${outputTokens}`);
-    console.log(`  Total tokens: ${inputTokens + contextTokens + outputTokens}`);
+    console.log(`  Nodes: ${result.nodeCount}`);
+    console.log(`  Edges: ${result.edgeCount}`);
+    console.log(`  Total tokens: ${result.totalTokens}`);
+    console.log(`  Method: ${result.method}`);
+
+    const benchmarkPath = '.graphwiki/benchmark.json';
+    if (existsSync(benchmarkPath) && !options.reset) {
+      try {
+        const prev = JSON.parse(readFileSync(benchmarkPath, 'utf-8'));
+        const prevTokens: number = prev.totalTokens ?? 0;
+        if (prevTokens > 0) {
+          const pctChange = ((result.totalTokens - prevTokens) / prevTokens) * 100;
+          if (pctChange > 10) {
+            console.warn(`[GraphWiki] REGRESSION: token usage increased by ${pctChange.toFixed(1)}% vs baseline`);
+          }
+        }
+      } catch {
+        // ignore corrupted baseline
+      }
+    }
+
+    mkdirSync('.graphwiki', { recursive: true });
+    writeFileSync(benchmarkPath, JSON.stringify(result, null, 2), 'utf-8');
+    console.log(`[GraphWiki] Benchmark saved to ${benchmarkPath}`);
   });
 
 // Refine command
