@@ -329,7 +329,11 @@ jobs:
           VERSION="${{ steps.version.outputs.publish_version }}"
           ESCAPED_VERSION=$(echo "$VERSION" | sed 's/\./\\./g')
           NOTES=$(awk '/^## \[?'"${ESCAPED_VERSION}"'\]?/{found=1; next} /^## /{found=0} found' CHANGELOG.md | grep -v '^[[:space:]]*$' | head -50 || true)
-          gh release create "v${VERSION}" \
-            --title "v${VERSION}" \
-            --notes "${NOTES:-Release ${VERSION}}" \
-            --repo "${{ github.repository }}"
+          if gh release view "v${VERSION}" --repo "${{ github.repository }}" &>/dev/null; then
+            echo "Release v${VERSION} already exists — skipping (idempotent)"
+          else
+            gh release create "v${VERSION}" \
+              --title "v${VERSION}" \
+              --notes "${NOTES:-Release ${VERSION}}" \
+              --repo "${{ github.repository }}"
+          fi
