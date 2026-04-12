@@ -155,3 +155,4 @@ describe('FileWatcher', () => {
     expect(onUpdate).not.toHaveBeenCalled();
   });
 });
+

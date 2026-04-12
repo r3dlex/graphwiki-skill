@@ -28,9 +28,11 @@ export default defineConfig({
         'tests/**',
         'dist/**',
         'node_modules/**',
+        '.claude/**',
         '**/*.d.ts',
         'vitest.config.ts',
         'tsup.config.ts',
+        'eslint.config.js',
       ],
       thresholds: {
         lines: 80,
