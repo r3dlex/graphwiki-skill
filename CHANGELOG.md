@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+## [3.0.6] - 2026-04-13
+
+### Changed
+- `graphwiki build .` now compiles the wiki automatically after building the graph — no separate `--wiki-only` step needed
+- `--graph-only` skips wiki compilation (graph only)
+- `--wiki-only` remains: compile wiki from existing graph, skip extraction
+- `--force` and `--update` variants include wiki compilation as part of the build
+
 ## [3.0.5] - 2026-04-13
 
 ### Added
