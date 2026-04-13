@@ -55,8 +55,8 @@ const DEFAULT_WIKI: GraphWikiWiki = {
 };
 
 const DEFAULT_PATHS: GraphWikiPaths = {
-  graph: '.graphwiki/graph.json',
-  wiki: '.graphwiki/wiki',
+  graph: 'graphwiki-out/graph.json',
+  wiki: 'graphwiki-out/wiki',
   deltas: 'graphwiki-out/deltas',
   report: 'graphwiki-out/GRAPH_REPORT.md',
   svg: 'graphwiki-out/graph.svg',
@@ -108,7 +108,7 @@ interface GraphDocument {
 // Utility Functions
 // ============================================================
 
-async function loadGraph(graphPath = '.graphwiki/graph.json'): Promise<GraphDocument> {
+async function loadGraph(graphPath = 'graphwiki-out/graph.json'): Promise<GraphDocument> {
   try {
     const content = await readFile(graphPath, 'utf-8');
     const graph = JSON.parse(content) as GraphDocument;
@@ -330,6 +330,23 @@ program
         ignore: extractionIgnores,
         absolute: false,
       });
+
+      // Also include raw/ input documents if present
+      const rawDir = join(path, 'raw');
+      if (existsSync(rawDir)) {
+        const rawFiles = await glob("**/*", {
+          cwd: rawDir,
+          ignore: extractionIgnores,
+          absolute: false,
+        });
+        // Prefix with 'raw/' so source_file paths are relative to project root
+        const prefixedRaw = rawFiles.map(f => join('raw', f));
+        discovered.push(...prefixedRaw);
+        if (rawFiles.length > 0) {
+          console.log(`[GraphWiki] Found ${rawFiles.length} files in raw/`);
+        }
+      }
+
       fileCount = discovered.length;
 
       console.log(`[GraphWiki] Found ${fileCount} files`);

@@ -7,8 +7,8 @@ coverage/
 .env
 *.log
 .DS_Store
-graphwiki-out/
 .wiki/
+raw/
 .cache/
 *.graph.json
 SKILL-*.md

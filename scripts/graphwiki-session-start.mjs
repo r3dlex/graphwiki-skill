@@ -67,7 +67,7 @@ async function main() {
     suppressOutput: true,
     hookSpecificOutput: {
       hookEventName: 'SessionStart',
-      additionalContext: `[GraphWiki] Graph: ${status.nodes} nodes, ${status.edges} edges, drift: ${status.drift}`,
+      additionalContext: `[GraphWiki] Graph: ${status.nodes} nodes, ${status.edges} edges, drift: ${status.drift}\nRead graphwiki-out/graph.json for the knowledge graph. Read graphwiki-out/wiki/ for compiled wiki pages. Drop source documents in raw/ for extraction.`,
     },
   }) + '\n');
 }
