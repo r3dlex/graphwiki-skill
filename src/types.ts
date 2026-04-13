@@ -20,6 +20,7 @@ export interface GraphEdge {
   label?: string;
   provenance?: string[];
   directed?: boolean;
+  confidence?: 'EXTRACTED' | 'INFERRED' | 'AMBIGUOUS';
 }
 
 export interface GraphDocument {

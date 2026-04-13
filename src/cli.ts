@@ -9,7 +9,7 @@ import { glob } from 'glob';
 import { resolveIgnoresSplit } from './util/ignore-resolver.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, writeFileSync, unlinkSync, readFileSync, mkdirSync, readdirSync } from 'fs';
+import { existsSync, writeFileSync, unlinkSync, readFileSync, mkdirSync, readdirSync, appendFileSync } from 'fs';
 import { computeDelta, persistDelta } from './graph/delta.js';
 import { DriftDetector } from './graph/drift.js';
 import { BatchCoordinator } from './extract/batch-coordinator.js';
@@ -18,6 +18,7 @@ import { createRefinementHistory } from './refine/history.js';
 import { loadHeldOutQueries } from './refine/held-queries.js';
 import type { IncrementalBuildResult, QueryScore } from './types.js';
 import { exportObsidian } from './export/obsidian.js';
+import { validateUrl } from './util/security.js';
 import { ASTExtractor } from './extract/ast-extractor.js';
 import { detectLanguage } from './detect/detector.js';
 
@@ -40,6 +41,7 @@ interface GraphWikiPaths {
   svg: string;
   driftLog: string;
   raw: string;
+  log?: string;
 }
 
 interface GraphWikiWiki {
@@ -80,6 +82,13 @@ async function loadConfig(): Promise<GraphWikiConfig> {
   } catch {
     return { paths: { ...DEFAULT_PATHS }, wiki: { ...DEFAULT_WIKI } };
   }
+}
+
+function appendLog(logPath: string, operation: string, detail: string): void {
+  const dir = dirname(logPath);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const entry = `- ${new Date().toISOString()} [${operation}] ${detail}\n`;
+  appendFileSync(logPath, entry, 'utf-8');
 }
 
 // ============================================================
@@ -327,18 +336,61 @@ program
       // Auto-scaffold .graphwikiignore on first build
       const graphwikiignorePath = join(path, '.graphwikiignore');
       if (!existsSync(graphwikiignorePath)) {
-        const defaultIgnorePatterns = [
-          'node_modules/',
-          'dist/',
-          '.git/',
+        const ignoreLines: string[] = [
+          '# GraphWiki ignore patterns (auto-generated)',
+          '',
+          '# Always excluded',
           'coverage/',
+          '.git/',
+          '.cache/',
           '*.log',
-          '*.lock',
           '.DS_Store',
+          '.env',
+          '.env.*',
           'graphwiki-out/',
+          'graphify-out/',
           '.graphwiki/',
-        ].join('\n') + '\n';
-        writeFileSync(graphwikiignorePath, defaultIgnorePatterns, 'utf-8');
+        ];
+
+        if (existsSync(join(path, 'package.json'))) {
+          ignoreLines.push('');
+          ignoreLines.push('# Node.js / TypeScript (detected)');
+          ignoreLines.push('node_modules/');
+          ignoreLines.push('dist/');
+          ignoreLines.push('build/');
+          ignoreLines.push('.next/');
+          ignoreLines.push('*.lock');
+        }
+
+        if (existsSync(join(path, 'pyproject.toml')) || existsSync(join(path, 'requirements.txt'))) {
+          ignoreLines.push('');
+          ignoreLines.push('# Python (detected)');
+          ignoreLines.push('__pycache__/');
+          ignoreLines.push('*.pyc');
+          ignoreLines.push('.venv/');
+          ignoreLines.push('venv/');
+        }
+
+        if (existsSync(join(path, 'Cargo.toml'))) {
+          ignoreLines.push('');
+          ignoreLines.push('# Rust (detected)');
+          ignoreLines.push('target/');
+        }
+
+        if (existsSync(join(path, 'mix.exs'))) {
+          ignoreLines.push('');
+          ignoreLines.push('# Elixir (detected)');
+          ignoreLines.push('deps/');
+          ignoreLines.push('_build/');
+        }
+
+        if (existsSync(join(path, 'go.mod'))) {
+          ignoreLines.push('');
+          ignoreLines.push('# Go (detected)');
+          ignoreLines.push('vendor/');
+        }
+
+        writeFileSync(graphwikiignorePath, ignoreLines.join('\n') + '\n', 'utf-8');
         console.log('Created .graphwikiignore with default patterns');
       }
 
@@ -556,6 +608,11 @@ program
       // Simulate build completion
       console.log('[GraphWiki] Build complete!');
       console.log(`[GraphWiki] Graph now has ${finalGraph.nodes.length} nodes, ${finalGraph.edges.length} edges`);
+      {
+        const logPath = config.paths.log ?? join(dirname(config.paths.graph), 'log.md');
+        const communities = new Set(finalGraph.nodes.map(n => n.community).filter(c => c !== undefined)).size;
+        appendLog(logPath, 'build', `${finalGraph.nodes.length} nodes, ${finalGraph.edges.length} edges, ${communities} communities`);
+      }
 
       const durationMs = Date.now() - startTime;
       _incrementalResult = {
@@ -645,6 +702,21 @@ program
       }
 
       await saveGraph(finalGraph, config.paths.graph);
+
+      // CR-01+CR-02: Generate GRAPH_REPORT.md and print JSON summary after every build
+      const { communities: buildCommunityCount } = generateGraphReport(finalGraph, config.paths.report);
+      const pendingPromptsDir = join(graphwikiDir, 'pending');
+      const pendingPrompts = existsSync(pendingPromptsDir)
+        ? readdirSync(pendingPromptsDir).filter((f: string) => f.endsWith('.prompt.md')).length
+        : 0;
+      console.log(`[GraphWiki] Summary: ${JSON.stringify({
+        nodes: finalGraph.nodes.length,
+        edges: finalGraph.edges.length,
+        communities: buildCommunityCount,
+        pendingPrompts,
+        reportPath: config.paths.report,
+        tokens_used: 0,
+      })}`);
 
       // Default build: compile wiki after graph is saved (skip if --graph-only or --wiki-only)
       if (!options.graphOnly && !options.wikiOnly) {
@@ -872,6 +944,10 @@ program
     }
 
     console.log('[GraphWiki] To get detailed answers, use graphwiki ask command');
+    {
+      const logPath = config.paths.log ?? join(dirname(config.paths.graph), 'log.md');
+      appendLog(logPath, 'query', `"${question}" → ${matching.length} nodes matched`);
+    }
   });
 
 // Ask command
@@ -955,6 +1031,10 @@ program
 
     console.log(lines.join('\n'));
     console.log('\n[GraphWiki] Context preparation complete. Use the above context to answer the question.');
+    {
+      const logPath = config.paths.log ?? join(dirname(config.paths.graph), 'log.md');
+      appendLog(logPath, 'ask', `"${question}"`);
+    }
   });
 
 // Ingest command
@@ -1034,6 +1114,10 @@ program
       await saveGraph(graph, config.paths.graph);
       console.log(`[GraphWiki] Ingested: ${nodeLabel}`);
       console.log(`[GraphWiki] Graph now has ${graph.nodes.length} nodes`);
+      {
+        const logPath = config.paths.log ?? join(dirname(config.paths.graph), 'log.md');
+        appendLog(logPath, 'ingest', nodeLabel);
+      }
     } catch (err) {
       console.error(`[GraphWiki] Error: ${err}`);
       process.exit(1);
@@ -1145,6 +1229,70 @@ program
     }
   });
 
+// Helper: generate and write GRAPH_REPORT.md — shared by build and status --report
+function generateGraphReport(graph: GraphDocument, reportPath: string): { communities: number } {
+  const byType = new Map<string, number>();
+  for (const node of graph.nodes) {
+    const type = node.type || 'unknown';
+    byType.set(type, (byType.get(type) || 0) + 1);
+  }
+
+  const communities = new Set<number>();
+  for (const node of graph.nodes) {
+    if (node.community !== undefined) {
+      communities.add(node.community);
+    }
+  }
+
+  const maxEdges = graph.nodes.length * (graph.nodes.length - 1);
+  const density = maxEdges > 0 ? (graph.edges.length / maxEdges).toFixed(4) : '0';
+
+  const degree = new Map<string, number>();
+  for (const edge of graph.edges) {
+    degree.set(edge.source, (degree.get(edge.source) || 0) + 1);
+    degree.set(edge.target, (degree.get(edge.target) || 0) + 1);
+  }
+  const topNodes = [...degree.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([id, deg]) => ({ label: graph.nodes.find(n => n.id === id)?.label ?? id, deg }));
+
+  const lines: string[] = [
+    '# GraphWiki Report',
+    '',
+    `Generated: ${new Date().toISOString()}`,
+    '',
+    '## Summary',
+    `- Nodes: ${graph.nodes.length}`,
+    `- Edges: ${graph.edges.length}`,
+    `- Communities: ${communities.size}`,
+    `- Density: ${density}`,
+    '',
+    '## Nodes by Type',
+    '| Type | Count |',
+    '|------|-------|',
+  ];
+  for (const [type, count] of [...byType.entries()].sort((a, b) => b[1] - a[1])) {
+    lines.push(`| ${type} | ${count} |`);
+  }
+  lines.push('', '## Top Connected Nodes (by degree)', '| Node | Edges |', '|------|-------|');
+  for (const { label, deg } of topNodes) {
+    lines.push(`| ${label} | ${deg} |`);
+  }
+  if (graph.metadata && Object.keys(graph.metadata).length > 0) {
+    lines.push('', '## Metadata', '| Key | Value |', '|-----|-------|');
+    for (const [key, value] of Object.entries(graph.metadata)) {
+      lines.push(`| ${key} | ${value} |`);
+    }
+  }
+  lines.push('');
+  const reportContent = lines.join('\n');
+  mkdirSync(dirname(reportPath), { recursive: true });
+  writeFileSync(reportPath, reportContent, 'utf-8');
+  console.log(`[GraphWiki] Report: ${reportPath}`);
+  return { communities: communities.size };
+}
+
 // Status command
 program
   .command('status')
@@ -1154,72 +1302,21 @@ program
     const config = await loadConfig();
     const graph = await loadGraph(config.paths.graph);
 
-    // Count by type
-    const byType = new Map<string, number>();
-    for (const node of graph.nodes) {
-      const type = node.type || 'unknown';
-      byType.set(type, (byType.get(type) || 0) + 1);
-    }
-
-    // Communities
-    const communities = new Set<number>();
-    for (const node of graph.nodes) {
-      if (node.community !== undefined) {
-        communities.add(node.community);
-      }
-    }
-
-    // Density
-    const maxEdges = graph.nodes.length * (graph.nodes.length - 1);
-    const density = maxEdges > 0 ? (graph.edges.length / maxEdges).toFixed(4) : '0';
-
-    // Top connected nodes by degree
-    const degree = new Map<string, number>();
-    for (const edge of graph.edges) {
-      degree.set(edge.source, (degree.get(edge.source) || 0) + 1);
-      degree.set(edge.target, (degree.get(edge.target) || 0) + 1);
-    }
-    const topNodes = [...degree.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([id, deg]) => ({ label: graph.nodes.find(n => n.id === id)?.label ?? id, deg }));
-
     if (options.report) {
-      // Build markdown report
-      const lines: string[] = [
-        '# GraphWiki Report',
-        '',
-        `Generated: ${new Date().toISOString()}`,
-        '',
-        '## Summary',
-        `- Nodes: ${graph.nodes.length}`,
-        `- Edges: ${graph.edges.length}`,
-        `- Communities: ${communities.size}`,
-        `- Density: ${density}`,
-        '',
-        '## Nodes by Type',
-        '| Type | Count |',
-        '|------|-------|',
-      ];
-      for (const [type, count] of [...byType.entries()].sort((a, b) => b[1] - a[1])) {
-        lines.push(`| ${type} | ${count} |`);
-      }
-      lines.push('', '## Top Connected Nodes (by degree)', '| Node | Edges |', '|------|-------|');
-      for (const { label, deg } of topNodes) {
-        lines.push(`| ${label} | ${deg} |`);
-      }
-      if (graph.metadata && Object.keys(graph.metadata).length > 0) {
-        lines.push('', '## Metadata', '| Key | Value |', '|-----|-------|');
-        for (const [key, value] of Object.entries(graph.metadata)) {
-          lines.push(`| ${key} | ${value} |`);
-        }
-      }
-      lines.push('');
-      const reportContent = lines.join('\n');
-      mkdirSync(dirname(config.paths.report), { recursive: true });
-      writeFileSync(config.paths.report, reportContent, 'utf-8');
-      console.log(`[GraphWiki] Report written to ${config.paths.report}`);
+      generateGraphReport(graph, config.paths.report);
     } else {
+      const byType = new Map<string, number>();
+      for (const node of graph.nodes) {
+        const type = node.type || 'unknown';
+        byType.set(type, (byType.get(type) || 0) + 1);
+      }
+      const communities = new Set<number>();
+      for (const node of graph.nodes) {
+        if (node.community !== undefined) communities.add(node.community);
+      }
+      const maxEdges = graph.nodes.length * (graph.nodes.length - 1);
+      const density = maxEdges > 0 ? (graph.edges.length / maxEdges).toFixed(4) : '0';
+
       console.log('=== GraphWiki Status ===');
       console.log(`Nodes: ${graph.nodes.length}`);
       console.log(`Edges: ${graph.edges.length}`);
@@ -1809,6 +1906,12 @@ program
   .action(async (url: string, options) => {
     console.log(`[GraphWiki] Adding URL: ${url}`);
 
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      console.error(`[GraphWiki] URL rejected: ${validation.reason}`);
+      return;
+    }
+
     try {
       const { fetchUrl } = await import('./ingest/url-fetcher.js');
       const result = await fetchUrl(url, {
@@ -1857,6 +1960,10 @@ program
       await saveGraph(graph, config.paths.graph);
       console.log(`[GraphWiki] Ingested: ${nodeLabel}`);
       console.log(`[GraphWiki] Graph now has ${graph.nodes.length} nodes`);
+      {
+        const logPath = config.paths.log ?? join(dirname(config.paths.graph), 'log.md');
+        appendLog(logPath, 'add', url);
+      }
     } catch (err) {
       console.error(`[GraphWiki] Error: ${err}`);
       process.exit(1);
@@ -1866,10 +1973,73 @@ program
 // Save-result command (memory feedback loop)
 program
   .command('save-result')
-  .description('Merge an LLM result JSON into the graph and archive the prompt file')
-  .argument('<promptFile>', 'Path to the prompt file in .graphwiki/pending/')
-  .argument('<resultFile>', 'Path to the result JSON file ({ nodes, edges })')
-  .action(async (promptFile: string, resultFile: string) => {
+  .description('Merge an LLM result JSON into the graph and archive the prompt file, or save a memory/wiki entry')
+  .argument('[promptFile]', 'Path to the prompt file in .graphwiki/pending/')
+  .argument('[resultFile]', 'Path to the result JSON file ({ nodes, edges })')
+  .option('--question <text>', 'The question or query being answered')
+  .option('--answer <text>', 'The answer or insight to record')
+  .option('--type <type>', 'Memory type: insight | decision | discovery', 'insight')
+  .option('--nodes <nodes...>', 'Referenced node IDs')
+  .action(async (promptFile: string | undefined, resultFile: string | undefined, opts: {
+    question?: string;
+    answer?: string;
+    type?: string;
+    nodes?: string[];
+  }) => {
+    if (opts.question !== undefined) {
+      // Memory loop mode: write memory file + wiki query page
+      const question = opts.question;
+      const answer = opts.answer ?? '';
+      const memoryType = opts.type ?? 'insight';
+      const nodes = opts.nodes ?? [];
+      const timestamp = new Date().toISOString();
+
+      // Build slug from question: lowercase, spaces→hyphens, strip non-alphanumeric (except hyphens), truncate to 40
+      const slug = question
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .slice(0, 40)
+        .replace(/-+$/, '');
+
+      const nodesYaml = nodes.length > 0
+        ? `[${nodes.map(n => n).join(', ')}]`
+        : '[]';
+      const nodesSection = nodes.length > 0
+        ? `\n## Referenced Nodes\n${nodes.map(n => `- ${n}`).join('\n')}\n`
+        : '';
+
+      const frontmatter = `---\ntype: memory\nquestion: "${question}"\nanswer: "${answer.replace(/"/g, '\\"')}"\nmemory_type: ${memoryType}\nnodes: ${nodesYaml}\ncreated_at: ${timestamp}\n---\n`;
+      const body = `# ${question}\n${answer}${nodesSection}`;
+      const content = frontmatter + body;
+
+      const filename = `${timestamp.replace(/[:.]/g, '-').replace('T', 'T').slice(0, 23)}-${slug}.md`;
+
+      const memoryDir = 'graphwiki-out/memory';
+      const wikiDir = 'graphwiki-out/wiki/queries';
+      mkdirSync(memoryDir, { recursive: true });
+      mkdirSync(wikiDir, { recursive: true });
+
+      const memoryPath = join(memoryDir, filename);
+      const wikiPath = join(wikiDir, `${slug}.md`);
+
+      writeFileSync(memoryPath, content, 'utf-8');
+      writeFileSync(wikiPath, content, 'utf-8');
+
+      console.log(`Saved memory: ${memoryPath}`);
+      {
+        const logPath = join('graphwiki-out', 'log.md');
+        appendLog(logPath, 'save-result', `"${question}"`);
+      }
+      return;
+    }
+
+    // Original positional form: merge result JSON into graph
+    if (!promptFile || !resultFile) {
+      console.error('[GraphWiki] Usage: save-result <promptFile> <resultFile>  OR  save-result --question "..." --answer "..."');
+      process.exit(1);
+    }
+
     const config = await loadConfig();
 
     // Read result file
@@ -1924,6 +2094,10 @@ program
     }
 
     console.log(`Saved ${newNodes.length} nodes, ${newEdges.length} edges from result. Graph updated.`);
+    {
+      const logPath = join('graphwiki-out', 'log.md');
+      appendLog(logPath, 'save-result', `${newNodes.length} nodes, ${newEdges.length} edges merged`);
+    }
   });
 
 // ============================================================

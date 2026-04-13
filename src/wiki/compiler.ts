@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import type {
   GraphDocument,
   GraphNode,
@@ -36,6 +38,8 @@ export class WikiCompiler {
     community: CommunityMeta,
     nodes: GraphNode[],
     edges: GraphEdge[],
+    allNodes?: GraphNode[],
+    allEdges?: GraphEdge[],
   ): Promise<WikiPage> {
     const stage1 = await this.compileStage1(community, nodes, edges);
     const pageName = community.label || `community-${community.id}`;
@@ -83,12 +87,65 @@ export class WikiCompiler {
       tags.push(`community-${community.id}`);
     }
 
+    // sources: unique source files from community nodes
+    const sources = [...new Set(communityNodes.map((n) => n.source_file).filter((s): s is string => Boolean(s)))];
+
+    // related: labels of adjacent communities (sharing an edge with this community)
+    const communityNodeIds = new Set(communityNodes.map((n) => n.id));
+    const adjacentCommunityIds = new Set<number>();
+    const edgePool = allEdges ?? edges;
+    const nodePool = allNodes ?? nodes;
+    for (const edge of edgePool) {
+      const srcInCommunity = communityNodeIds.has(edge.source);
+      const tgtInCommunity = communityNodeIds.has(edge.target);
+      if (srcInCommunity !== tgtInCommunity) {
+        const outsideNodeId = srcInCommunity ? edge.target : edge.source;
+        const outsideNode = nodePool.find((n) => n.id === outsideNodeId);
+        if (outsideNode?.community !== undefined && outsideNode.community !== community.id) {
+          adjacentCommunityIds.add(outsideNode.community);
+        }
+      }
+    }
+    // Map adjacent community ids to their labels
+    const related: string[] = [];
+    for (const adjId of adjacentCommunityIds) {
+      const adjNodes = nodePool.filter((n) => n.community === adjId);
+      if (adjNodes.length > 0) {
+        // Use a representative label: the first node label or a generated one
+        related.push(`community-${adjId}`);
+      }
+    }
+
+    // confidence: based on edge confidence values within the community
+    const communityEdges = edges.filter(
+      (e) => communityNodeIds.has(e.source) && communityNodeIds.has(e.target),
+    );
+    let confidence: 'high' | 'medium' | 'low' = 'medium';
+    if (communityEdges.length > 0) {
+      const allExtracted = communityEdges.every((e) => e.confidence === 'EXTRACTED');
+      const inferredOrAmbiguousCount = communityEdges.filter(
+        (e) => e.confidence === 'INFERRED' || e.confidence === 'AMBIGUOUS',
+      ).length;
+      if (allExtracted) {
+        confidence = 'high';
+      } else if (inferredOrAmbiguousCount / communityEdges.length > 0.5) {
+        confidence = 'low';
+      }
+    }
+
+    const now = new Date().toISOString();
+
     return {
       path: `wiki/${pageName.replace(/\s+/g, '-').toLowerCase()}.md`,
       frontmatter: {
         community: community.id,
         label: pageName,
         type: 'community',
+        confidence,
+        sources: sources.length > 0 ? sources : undefined,
+        related: related.length > 0 ? related : undefined,
+        created_at: now,
+        updated_at: now,
         tags,
       },
       content,
@@ -189,9 +246,104 @@ export class WikiCompiler {
     };
   }
 
+  generateSourcePages(graph: GraphDocument, wikiDir: string): WikiPage[] {
+    const bySource = new Map<string, { nodes: GraphNode[]; edges: GraphEdge[] }>();
+
+    for (const node of graph.nodes) {
+      if (!node.source_file) continue;
+      if (!bySource.has(node.source_file)) {
+        bySource.set(node.source_file, { nodes: [], edges: [] });
+      }
+      bySource.get(node.source_file)!.nodes.push(node);
+    }
+
+    for (const [sourceFile, entry] of bySource) {
+      const nodeIds = new Set(entry.nodes.map((n) => n.id));
+      entry.edges = graph.edges.filter(
+        (e) => nodeIds.has(e.source) && nodeIds.has(e.target),
+      );
+      if (entry.nodes.length < 2) {
+        bySource.delete(sourceFile);
+      }
+    }
+
+    const sourcesDir = join(wikiDir, 'sources');
+    mkdirSync(sourcesDir, { recursive: true });
+
+    const now = new Date().toISOString();
+    const pages: WikiPage[] = [];
+
+    for (const [sourceFile, { nodes, edges }] of bySource) {
+      const safeFilename = sourceFile
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[/\\]/g, '-')
+        .replace(/\s+/g, '-');
+
+      const conceptsList = nodes
+        .map((n) => `- **${n.label}** (${n.type})`)
+        .join('\n');
+
+      const relationsList = edges
+        .map((e) => {
+          const srcNode = nodes.find((n) => n.id === e.source);
+          const tgtNode = nodes.find((n) => n.id === e.target);
+          const srcLabel = srcNode?.label ?? e.source;
+          const tgtLabel = tgtNode?.label ?? e.target;
+          return `- ${srcLabel} → ${tgtLabel} (${e.label ?? 'related'})`;
+        })
+        .join('\n');
+
+      const content = [
+        `# ${sourceFile}`,
+        '',
+        `> ${nodes.length} concepts extracted`,
+        '',
+        '## Concepts',
+        '',
+        conceptsList,
+        ...(edges.length > 0
+          ? ['', '## Relationships', '', relationsList]
+          : []),
+      ].join('\n');
+
+      const frontmatter = {
+        type: 'source',
+        title: sourceFile,
+        source_file: sourceFile,
+        node_count: nodes.length,
+        created_at: now,
+      };
+
+      const fmLines = [
+        '---',
+        ...Object.entries(frontmatter).map(([k, v]) => `${k}: ${v}`),
+        '---',
+        '',
+      ].join('\n');
+
+      const filePath = join(sourcesDir, `${safeFilename}.md`);
+      writeFileSync(filePath, fmLines + content, 'utf-8');
+
+      pages.push({
+        path: `wiki/sources/${safeFilename}.md`,
+        frontmatter: {
+          label: sourceFile,
+          type: 'source',
+          sources: [sourceFile],
+          created_at: now,
+          updated_at: now,
+        },
+        content,
+      });
+    }
+
+    return pages;
+  }
+
   async compileAll(
     communities: CommunityMeta[],
     graph: GraphDocument,
+    wikiDir?: string,
   ): Promise<WikiPage[]> {
     // Sort by priority: highest node count first, then god nodes, then dependency order
     const sorted = [...communities].sort((a, b) => {
@@ -217,10 +369,15 @@ export class WikiCompiler {
               communityNodes.some((n) => n.id === e.source) &&
               communityNodes.some((n) => n.id === e.target),
           );
-          return this.compileCommunity(community, communityNodes, communityEdges);
+          return this.compileCommunity(community, communityNodes, communityEdges, graph.nodes, graph.edges);
         }),
       );
       results.push(...pages);
+    }
+
+    if (wikiDir) {
+      const sourcePages = this.generateSourcePages(graph, wikiDir);
+      results.push(...sourcePages);
     }
 
     return results;

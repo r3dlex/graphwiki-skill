@@ -5,6 +5,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+## [3.0.8] - 2026-04-13
+
+### Added
+- `GRAPH_REPORT.md` now generated automatically during every `graphwiki build` — agents can read it immediately after build without running `status --report` separately
+- Structured JSON summary line printed at end of build: `[GraphWiki] Summary: {"nodes":N,"edges":M,...}` for machine parsing
+- Append-only `graphwiki-out/log.md` audit trail — every build, query, ask, add, ingest, and save-result appends a timestamped entry
+- `save-result` redesigned for Karpathy memory loop: `--question/--answer/--type/--nodes` flags write Q&A pages to `graphwiki-out/memory/` and `graphwiki-out/wiki/queries/`
+- Per-source wiki summary pages generated in `graphwiki-out/wiki/sources/` during wiki compilation (zero LLM calls)
+- `WikiPageFrontmatter` extended with `confidence`, `sources`, `related`, `created_at`, `updated_at` fields
+- `src/util/security.ts` security module: `validateUrl`, `sanitizePath`, `sanitizeLabel`, `escapeCypher` — `validateUrl` wired into `graphwiki add`
+- `graphwiki claude install` now writes a `## graphwiki` section to the project's `CLAUDE.md`
+- `.graphwikiignore` scaffold now detects project type (Node.js, Python, Rust, Elixir, Go) and adds language-specific ignore patterns
+
+### Changed
+- Cursor platform installer now writes `.cursor/rules/graphwiki.mdc` with `alwaysApply: true` frontmatter (was `.cursor/extensions/`)
+- Gemini platform installer now also appends to `GEMINI.md` and merges a `BeforeTool` hook in `.gemini/settings.json`
+- Codex platform installer now also writes a `PreToolUse` hook entry to `.codex/hooks.json`
+- Report generation logic extracted to shared `generateGraphReport()` helper — used by both build and `status --report`
+
 ## [3.0.7] - 2026-04-13
 
 ### Added

@@ -49,6 +49,8 @@ export class WikiUpdater {
           community,
           communityNodes,
           communityEdges,
+          graph.nodes,
+          graph.edges,
         );
         await this.writeWikiPage(page);
       }
@@ -140,7 +142,7 @@ export class WikiUpdater {
         node_count: communityNodes.length,
         label: `community-${communityId}`,
       };
-      const page = await this.compiler.compileCommunity(meta, communityNodes, communityEdges);
+      const page = await this.compiler.compileCommunity(meta, communityNodes, communityEdges, graph.nodes, graph.edges);
       await this.writeWikiPage(page);
     }
   }

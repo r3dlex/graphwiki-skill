@@ -311,7 +311,7 @@ describe('skill-installer', () => {
       expect(vi.mocked(await import('fs/promises')).writeFile).toHaveBeenCalled();
     });
 
-    it('should install cursor skill with JSON format', async () => {
+    it('should install cursor skill with MDC format', async () => {
       const { installSkill } = await import('./skill-installer.js');
       Object.defineProperty(process, 'env', {
         value: { HOME: '/home/user', PATH: '/usr/bin' },
@@ -321,12 +321,11 @@ describe('skill-installer', () => {
       await installSkill('cursor');
 
       const call = vi.mocked(vi.mocked(await import('fs/promises')).writeFile).mock.calls.find(
-        c => (c[0] as string).includes('graphwiki.json')
+        c => (c[0] as string).includes('graphwiki.mdc')
       );
       expect(call).toBeDefined();
       const content = call![1] as string;
-      const parsed = JSON.parse(content);
-      expect(parsed.name).toBe('GraphWiki');
+      expect(content).toContain('alwaysApply: true');
     });
 
     it('should install openclaw skill with YAML format', async () => {

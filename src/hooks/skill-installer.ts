@@ -243,6 +243,27 @@ ${skill.tools?.map(t => `- ${t}`).join('\n') ?? 'No tools required'}
 
   await mkdir(join(skillPath, skill.name), { recursive: true });
   await writeFile(join(skillPath, skill.name, 'prompt.md'), content, 'utf-8');
+
+  // Write/update ## graphwiki section in project CLAUDE.md
+  const claudeMdPath = join(process.cwd(), 'CLAUDE.md');
+  const section = `\n## graphwiki\n\nGraphWiki knowledge graph is active for this project.\n- Graph: graphwiki-out/graph.json\n- Report: graphwiki-out/GRAPH_REPORT.md\n- Wiki: graphwiki-out/wiki/\n\nWhen invoked via /graphwiki:\n1. Read graphwiki-out/GRAPH_REPORT.md for current graph summary\n2. Run: graphwiki query "<question>" to search the graph\n3. Never modify source files. Use --update for incremental builds.\n\nSee SKILL.md for full protocol.\n`;
+
+  let claudeMdContent = '';
+  try {
+    claudeMdContent = await readFile(claudeMdPath, 'utf-8');
+  } catch {
+    // File doesn't exist yet
+  }
+
+  const sectionRegex = /\n## graphwiki\n[\s\S]*?(?=\n## |\n# |$)/;
+  if (sectionRegex.test(claudeMdContent)) {
+    claudeMdContent = claudeMdContent.replace(sectionRegex, section);
+  } else {
+    claudeMdContent += section;
+  }
+
+  await writeFile(claudeMdPath, claudeMdContent, 'utf-8');
+  console.log(`[GraphWiki] Updated CLAUDE.md with graphwiki section`);
 }
 
 /**
@@ -257,6 +278,20 @@ async function installCodexSkill(skillPath: string): Promise<void> {
     `# ${skill.name}\n\n${skill.description}\n\n${skill.prompt}`,
     'utf-8'
   );
+
+  // Write/merge .codex/hooks.json with PreToolUse hook
+  const hooksPath = join(dirname(skillPath), 'hooks.json');
+  let hooksJson: { hooks: Record<string, Array<{ command: string }>> } = { hooks: {} };
+  try { hooksJson = JSON.parse(await readFile(hooksPath, 'utf-8')); } catch {}
+  if (!hooksJson.hooks['PreToolUse']) {
+    hooksJson.hooks['PreToolUse'] = [];
+  }
+  const pretoolCommand = `node ${join(process.cwd(), 'scripts', 'graphwiki-pretool.mjs')}`;
+  const alreadyPresent = hooksJson.hooks['PreToolUse'].some(e => e.command === pretoolCommand);
+  if (!alreadyPresent) {
+    hooksJson.hooks['PreToolUse'].push({ command: pretoolCommand });
+  }
+  await writeFile(hooksPath, JSON.stringify(hooksJson, null, 2), 'utf-8');
 }
 
 /**
@@ -271,6 +306,24 @@ async function installGeminiSkill(skillPath: string): Promise<void> {
     `${skill.name}\n\n${skill.description}\n\n${skill.prompt}`,
     'utf-8'
   );
+
+  // Append ## graphwiki section to GEMINI.md in project root
+  const geminiMdPath = join(process.cwd(), 'GEMINI.md');
+  const section = `\n## graphwiki\n\n${skill.prompt}\n`;
+  let existing = '';
+  try { const raw = await readFile(geminiMdPath, 'utf-8'); if (raw) existing = raw; } catch {}
+  if (!existing.includes('## graphwiki')) {
+    await writeFile(geminiMdPath, existing + section, 'utf-8');
+  }
+
+  // Merge BeforeTool entry in .gemini/settings.json
+  const settingsPath = join(dirname(skillPath), 'settings.json');
+  let settings: Record<string, unknown> = {};
+  try { settings = JSON.parse(await readFile(settingsPath, 'utf-8')); } catch {}
+  if (!settings['beforeTool']) {
+    settings['beforeTool'] = { command: 'node scripts/graphwiki-pretool.mjs' };
+  }
+  await writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 }
 
 /**
@@ -280,15 +333,12 @@ async function installCursorSkill(skillPath: string): Promise<void> {
   const skill = SKILL_DEFINITIONS.cursor;
 
   await mkdir(skillPath, { recursive: true });
-  await writeFile(
-    join(skillPath, 'graphwiki.json'),
-    JSON.stringify({
-      name: skill.name,
-      description: skill.description,
-      prompt: skill.prompt,
-    }, null, 2),
-    'utf-8'
-  );
+  const mdcContent = `---
+description: GraphWiki knowledge graph skill
+alwaysApply: true
+---
+${skill.prompt}`;
+  await writeFile(join(skillPath, 'graphwiki.mdc'), mdcContent, 'utf-8');
 }
 
 /**
@@ -498,9 +548,9 @@ export async function installSkill(
     },
 
     cursor: async () => {
-      const base = installPath ?? join(process.env.HOME ?? '.', '.cursor', 'extensions');
+      const base = installPath ?? join(process.cwd(), '.cursor', 'rules');
       await installCursorSkill(base);
-      return join(base, 'graphwiki.json');
+      return join(base, 'graphwiki.mdc');
     },
 
     openclaw: async () => {
@@ -741,29 +791,74 @@ export async function uninstallSkill(platform: Platform): Promise<void> {
       }
       await rm(skillDir, { recursive: true, force: true });
       console.log(`[GraphWiki] Removed claude skill directory: ${skillDir}`);
+
+      // Remove ## graphwiki section from project CLAUDE.md
+      const claudeMdPath = join(process.cwd(), 'CLAUDE.md');
+      if (await fileExists(claudeMdPath)) {
+        const claudeMdContent = await readFile(claudeMdPath, 'utf-8');
+        const sectionRegex = /\n## graphwiki\n[\s\S]*?(?=\n## |\n# |$)/;
+        if (sectionRegex.test(claudeMdContent)) {
+          await writeFile(claudeMdPath, claudeMdContent.replace(sectionRegex, ''), 'utf-8');
+          console.log(`[GraphWiki] Removed graphwiki section from CLAUDE.md`);
+        }
+      }
       break;
     }
 
     case 'codex': {
-      const filePath = join(home, '.codex', 'skills', 'graphwiki.md');
+      const skillsDir = join(process.cwd(), '.codex', 'skills');
+      const filePath = join(skillsDir, 'graphwiki.md');
       if (await fileExists(filePath)) {
         await unlink(filePath);
         console.log(`[GraphWiki] Removed codex skill: ${filePath}`);
+      }
+      // Remove graphwiki PreToolUse hook from .codex/hooks.json
+      const hooksPath = join(process.cwd(), '.codex', 'hooks.json');
+      if (await fileExists(hooksPath)) {
+        const hooksJson = JSON.parse(await readFile(hooksPath, 'utf-8')) as { hooks: Record<string, Array<{ command: string }>> };
+        if (Array.isArray(hooksJson.hooks['PreToolUse'])) {
+          const pretoolCommand = `node ${join(process.cwd(), 'scripts', 'graphwiki-pretool.mjs')}`;
+          hooksJson.hooks['PreToolUse'] = hooksJson.hooks['PreToolUse'].filter(e => e.command !== pretoolCommand);
+          if (hooksJson.hooks['PreToolUse'].length === 0) {
+            delete hooksJson.hooks['PreToolUse'];
+          }
+          await writeFile(hooksPath, JSON.stringify(hooksJson, null, 2), 'utf-8');
+          console.log(`[GraphWiki] Removed graphwiki hook from ${hooksPath}`);
+        }
       }
       break;
     }
 
     case 'gemini': {
-      const filePath = join(home, '.gemini', 'skills', 'graphwiki-prompt.txt');
+      const filePath = join(process.cwd(), '.gemini', 'skills', 'graphwiki-prompt.txt');
       if (await fileExists(filePath)) {
         await unlink(filePath);
         console.log(`[GraphWiki] Removed gemini skill: ${filePath}`);
+      }
+      // Remove ## graphwiki section from GEMINI.md
+      const geminiMdPath = join(process.cwd(), 'GEMINI.md');
+      if (await fileExists(geminiMdPath)) {
+        const content = await readFile(geminiMdPath, 'utf-8');
+        const cleaned = content.replace(/\n## graphwiki\n[\s\S]*?(?=\n## |\s*$)/, '').trimEnd();
+        await writeFile(geminiMdPath, cleaned + (cleaned.length ? '\n' : ''), 'utf-8');
+        console.log(`[GraphWiki] Removed graphwiki section from ${geminiMdPath}`);
+      }
+      // Remove beforeTool entry from .gemini/settings.json
+      const settingsPath = join(process.cwd(), '.gemini', 'settings.json');
+      if (await fileExists(settingsPath)) {
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8')) as Record<string, unknown>;
+        const bt = settings['beforeTool'] as Record<string, unknown> | undefined;
+        if (bt && bt['command'] === 'node scripts/graphwiki-pretool.mjs') {
+          delete settings['beforeTool'];
+          await writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+          console.log(`[GraphWiki] Removed beforeTool from ${settingsPath}`);
+        }
       }
       break;
     }
 
     case 'cursor': {
-      const filePath = join(home, '.cursor', 'extensions', 'graphwiki.json');
+      const filePath = join(process.cwd(), '.cursor', 'rules', 'graphwiki.mdc');
       if (await fileExists(filePath)) {
         await unlink(filePath);
         console.log(`[GraphWiki] Removed cursor skill: ${filePath}`);

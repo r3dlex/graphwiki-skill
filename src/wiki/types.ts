@@ -4,6 +4,9 @@ export interface WikiPageFrontmatter {
   community?: number;
   type?: string;
   label: string;
+  confidence?: 'high' | 'medium' | 'low';
+  sources?: string[];
+  related?: string[];
   created_at?: string;
   updated_at?: string;
   tags?: string[];

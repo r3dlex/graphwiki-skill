@@ -1,6 +1,6 @@
 {
   "name": "graphwiki",
-  "version": "3.0.7",
+  "version": "3.0.8",
   "description": "LLM-powered knowledge graph builder with persistent wiki compilation and Claude Code context loading protocol",
   "type": "module",
   "exports": {
