@@ -15,6 +15,7 @@
   "files": [
     "dist",
     "lib",
+    "assets",
     "SKILL.md",
     "SKILL-*.md",
     "scripts",
